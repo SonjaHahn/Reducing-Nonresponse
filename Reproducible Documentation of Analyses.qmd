@@ -1,0 +1,110 @@
+---
+title: "Reproducible Documentation of Analyses"
+author: "Sonja Hahn, Samuel Merk"
+format: html
+---
+
+## Libraries
+```{r loading libraries}
+#| message: false
+
+library(tidyverse)
+library(reactable)
+```
+
+
+## Data Download
+
+The raw data of the study blalablalba you can download it `r xfun::embed_file("data/eva_data_OEQexperimentI.csv", "eva_data_OEQexperimentI.csv", "here")` ...
+
+Itemcodes:
+
+```{r}
+read_csv("data/question_keys_data.csv") |> 
+  reactable()
+```
+
+
+## Data Import
+### Experiment 1
+#### OEI data
+```{r import the data}
+#| cache: true
+
+# raw data experiment 1 ########################################################
+## import data from suf
+data_s1 <- read_csv("data/eva_data_OEQexperimentI.csv")%>%
+  mutate(answer_text_isna = is.na(answer_text),
+         #die folgende Zeile macht effektiv das gleiche --> 
+         ## anpassen "sinnvolle Antwortlänge?"
+         answert_text_isna_or_length0 = ifelse(answer_text_isna == T, T,
+                                         nchar(answer_text) == 0),
+         no_oeq_answer = ifelse(question_id %in% c(47:48),
+                                answer_text_isna, NA),
+         question_id_fac = as.factor(question_id),
+         position = ifelse(survey_id %in% c(2,3), 
+                           "at the beginning", "at the end"),
+         instruction = ifelse(survey_id %in% c(2,5),
+                              "motivating instruction", "neutral instruction"),
+         oeq_answerlengthifgiven = ifelse(no_oeq_answer == T, 
+                                          NA, 
+                                          nchar(answer_text)),
+         oeq_answerlengthifgiven_log = log(oeq_answerlengthifgiven))%>%
+  group_by(class_id, question_id)%>%
+  mutate(oeq_answer_classprop = 1 - mean(no_oeq_answer, na.rm = T),
+         oeq_answerlengthifgiven_perclass = 
+           sum(nchar(answer_text), 
+               na.rm = T)/(n()-sum(no_oeq_answer)))%>%
+  ungroup()
+```
+
+#### SEEQ data
+```{r data-wrangling-s1-cfa-data}
+#| cache: true
+
+# pivoting to wide data frame with seeq data for CFA ##################################
+# Due to technical issues there are some nonunique entries per student and variables
+# These were remove with the following function
+paste_na_function <- function(x) ifelse(length(unique(na.omit(x))) > 1, NA, mean(x))
+
+data_s1_seeq <- data_s1%>%
+  select(respondent_hash, answer_integer, class_id, teacher_id, question_id)%>%
+  filter(question_id %in% c(1:20))%>%
+  unique(.)%>%
+  pivot_wider(
+    names_from = question_id,
+    values_from = answer_integer,
+    values_fn = list(answer_integer = paste_na_function)
+  )%>%
+  mutate(v1 = `1`, v2 = `2`, v3 = `3`, v4 = `4`, v5 = `5`, v6 = `6`, v7 = `7`, 
+         v8 = `8`, v9 = `9`, v10 = `10`, v11 = `11`, v12 = `12`, v13 = `13`, 
+         v14 = `14`, v15 = `15`, v16 = `16`, v17 = `17`, v18 = `18`, v19 = `19`,
+         v20 = `20`,
+         Learning = rowMeans(data.frame(v1, v2, v3, v4), na.rm = T),
+         Ethusiasm = rowMeans(data.frame(v5, v6, v7, v8), na.rm = T),
+         Organisation = rowMeans(data.frame(v9, v10, v11, v12), na.rm = T),
+         `Group Interaction` = rowMeans(data.frame(v14, v15, v16, v17), na.rm = T),
+         `Individual Rapport` = rowMeans(data.frame(v18, v19, v20), na.rm = T))
+```
+
+
+## Recoding
+
+Was zählt als **sinnvolle** Antwort?
+
+Wer bricht SEEQ ab?
+```{r}
+# aller personen mit mindestens einem seeeq item
+data_s1 |> 
+  select(completed_survey_id, question_id, answer_integer) |> 
+  filter(question_id %in% c(1:20)) |> 
+  na.omit() |> 
+  select(completed_survey_id) |> 
+  distinct()
+
+# alle personen
+data_s1 |> 
+  select(completed_survey_id) |> 
+  distinct()
+```
+
