@@ -1,0 +1,47 @@
+id,short_name,statement
+1,Nützliches gelernt?,Du hast im Kurs etwas Nützliches gelernt.
+2,Interesse gestiegen?,Dein Interesse am Mathematik-Abistoff ist durch den Kurs gestiegen.
+3,Inhalt verstanden?,Du hast den Inhalt des Kurses verstanden.
+4,herausfordernd/anregend?,Du fandest den Kurs herausfordernd und wurdest zum Denken angeregt.
+5,mit Begeisterung?,{{$teacher->first_name}} unterrichtet mit Begeisterung
+6,dynamisch/voller Engergie?,{{$teacher->first_name}} ist dynamisch und voller Energie
+7,Humor?,{{$teacher->first_name}} lockert den Unterricht durch Humor auf.
+8,Interesse aufrecht?,"{{$teacher->first_name}} hält Dein Interesse während des Kurses durch {{$teacher->is_male ? ""seinen"" : ""ihren"" }} Unterrichtsstil aufrecht."
+9,Erklärungen verständlich?,Die Erklärungen von {{$teacher->first_name}} sind verständlich.
+10,gut vorbereitet?,{{$teacher->first_name}} ist gut vorbereitet und erklärt die Inhalte sorgfältig.
+11,Überblick über Themen?,Du hast im Kurs einen Überblick über alle Abi-relevanten Themen erhalten.
+12,Bearbeitung geübt?,Du hast im Kurs die Bearbeitung Abi-relevanter Aufgabentypen geübt.
+13,Wissenlücken geschlossen?,Du hast durch den Kurs Wissenslücken schließen können.
+14,Ermutigung zur Diskussion?,"{{$teacher->first_name}} ermutigt die Teilnehmenden, an den Diskussionen im Kurs teilzunehmen."
+15,eigene Ideen?,"Die Kursteilnehmer*innen werden eingeladen, eigene Ideen und Lösungswege mitzuteilen"
+16,Fragen?,"Die Kursteilnehmer*innen werden ermutigt, Fragen zu stellen"
+17,Eigene Lösungswege?,"Die Kursteilnehmer*innen werden ermutigt, eigene Lösungswege zu formulieren und/oder die vorgetragenen Lösungen kritisch zu hinterfragen"
+18,stets freundlich?,{{$teacher->first_name}} ist den Teilnehmenden gegenüber stets freundlich.
+19,um Hilfe bitten können?,"{{$teacher->first_name}} gibt den Teilnehmenden das Gefühl, jederzeit um Hilfe bitten zu können."
+20,aufrichtiges Interesse,{{$teacher->first_name}} interessiert sich aufrichtig für die Teilnehmenden.
+21,kennt Namen?,{{$teacher->first_name}} kennt die Namen der Teilnehmenden.
+22,bemerkt Meldung?,"{{$teacher->first_name}} bemerkt, wenn Du Dich meldest."
+23,Schrift gut?,{{$teacher->first_name}} hat eine leserliche Schrift.
+24,Aussprache gut?,{{$teacher->first_name}} spricht deutlich.
+25,Strategien verständlich?,{{$teacher->first_name}} vermittelt verständliche Lösungsstrategien von Mathe-Aufgaben.
+26,Fragen beantwortet?,Im Kurs gestellte Fragen werden klar und verständlich beantwortet.
+27,Lerntempo gut?,Das Lerntempo ist zu hoch für Dich
+28,Aufgaben zu schwierig?,Die Aufgaben sind zu schwierig für Dich
+29,KL weiterempfehlen?,Würdest Du {{$teacher->first_name}} einem*einer Deiner Freund*innen weiterempfehlen?
+30,Andere*n KL gewünscht?,Hättest Du Dir für diesen Kurs einen anderen Kursleiter/eine andere Kursleiterin gewünscht?
+31,Nochmal besuchen?,"Stell Dir vor, Du könntest die Zeit zurückdrehen. Würdest Du den abiturma-Kurs noch einmal besuchen?"
+32,Teilnahme anraten?,Würdest Du Anderen zur Teilnahme an einem abiturma-Kurs raten?
+33,Leistungsniveau?,Was ist Dein aktuelles Leistungsniveau in Mathematik? (In Notenpunkten)
+34,Geschlecht?,Du bist...
+35,Schultyp?,Welchen Schultyp besuchst Du?
+36,Werbung?,Wie bist Du auf uns aufmerksam geworden?
+37,Woher Initiative?,Weshalb hast Du unseren Kurs besucht?
+38,Warum gerade unser Kurs?,Warum hast Du gerade unseren Kurs gebucht?
+39,Feedback KL,"Was könnte {{$teacher->first_name}} besser machen? Was hat {{$teacher->is_male? ""er"":""sie""}} besonders gut gemacht?"
+40,Feedback abiturma,Was könnte abiturma besser machen? Was hat abiturma besonders gut gemacht?
+41,Herbstteilnahme?,Hast Du im Herbst an einem abiturma-Kurs teilgenommen?
+44,Pseudonym?,Bitte trage die letzten 5 Ziffern Deiner Handynummer ein
+45,abiturma gut gemacht?,Was hat abiturma besonders gut gemacht?
+46,abiturma nicht gut gemacht?,Was könnte abiturma in Zukunft besser machen?
+47,KL gut gemacht?,Was hat {{$teacher->first_name}} besonders gut gemacht?
+48,KL nicht gut gemacht?,Was könnte {{$teacher->first_name}} in Zukunft besser machen?

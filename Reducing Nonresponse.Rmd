@@ -1,0 +1,417 @@
+---
+title             : "Reducing nonresponse to open-ended questions in mobile surveys of instructional quality. A Sequential Bayes Factor Analysis of two experiments."
+shorttitle        : "Reducing nonresponse to open-ended questions"
+
+author: 
+  - name          : "Samuel Merk"
+    affiliation   : "1"
+    corresponding : yes    # Define only one corresponding author
+    address       : "Muenzgasse 22"
+    email         : "samuel.merk@uni-tuebingen.de"
+  - name          : "Augustin Kelava"
+    affiliation   : "1"
+  - name          : "Thorsten Bohl"
+    affiliation   : "1"
+
+affiliation:
+  - id            : "1"
+    institution   : "Eberhard Karls Universität Tübingen"
+
+
+authornote: |
+  Samuel Merk, Faculty of Economics and Social Sciences, University of Tübingen; Augustin Kelava, Faculty of Economics and Social Sciences, University of Tübingen; Thorsten Bohl, Faculty of Economics and Social Sciences, University of Tübingen; 
+
+abstract: |
+  Mobile surveys of instructional quality are a frequently used method to ....
+  <!-- Passung zu Journal highlighten -->
+  Whereby answers to closed answers ... answers to open-ended questions function as .... To exploit this potential, teachers need narrative answers of high quality, which are traditionally difficult to access .. high rates nonresponse ... We report on two large experiments aimed at reducing nonresponsebias  
+  
+keywords          : "nonresponse; open-ended questions; survey; instructional quality; feedback"
+wordcount         : "X"
+
+bibliography      : ["bib/r-references.bib", "bib/sa-zotero-library.bib", "bib/in-press-citations.bib"]
+
+floatsintext      : no
+figurelist        : no
+tablelist         : no
+footnotelist      : no
+linenumbers       : yes
+mask              : no
+draft             : no
+
+documentclass     : "apa6"
+classoption       : "man"
+output            : papaja::apa6_pdf
+---
+
+```{r setup, include = FALSE}
+# libraries
+library(papaja)
+library(BayesFactor)
+library(tidyverse)
+library(hrbrthemes)
+library(lavaan)
+library(lavaan.survey)
+library(tidytext)
+
+# external files
+#download.file("https://drive.google.com/uc?authuser=0&id=1TXJ-bD_3VA1g2BtJH38NdKetFRlnmpED&export=download", "bib/sa-zotero-library.bib", overwrite = T)
+
+# custom functions
+fpf_la <- function(x){  
+  fm_tmp <- fitmeasures(x)
+  return(cat(sprintf(
+          "$\\chi^2$ = %s, _df_ = %s, CFI = %s, TLI = %s, RMSEA = %s, SRMR = %s",
+           round(fm_tmp[c("chisq")],3), 
+                 fm_tmp[c("df")],
+           round(fm_tmp[c("cfi")],3),
+           round(fm_tmp[c("tli")],3),
+           round(fm_tmp[c("rmsea")],3),
+           round(fm_tmp[c("srmr")],3))))
+}
+```
+
+```{r analysis-preferences}
+# Seed for random number generation
+set.seed(42)
+knitr::opts_chunk$set(cache.extra = knitr::rand_seed)
+```
+
+
+
+# Introduction
+## OEQs educational contexts 
+
+## Assessing OEQs with mobile surveys in educational contexts 
+
+
+... lead us to the following research questions:
+
+> How can nonresponses to open-ended questions in mobile surveys on instructional quality be reduced by the placement of the question at the beginning of the questionnaire, and the addition of an motivating introduction to the question stem?
+
+We aimed to provide answers to these research questions by conducting two experiments (Study 1 and Study 2). Both were conducted in the context of private tutoring. Students, who took private tutor lessons for one week in math, rated the instructional quality of this course using an adapted version [@merk2019ip] of the SEEQ [@marsh1982]. Additional to this likertype items, students were asked four open-ended questions about the strength and weakness of the teacher (OEQ 1 & 2) and the course provider (OEQ 2 & 3).
+
+## Sequential Sampling
+Both studies which we conducted, were field studies and constitute a randomized manipulation of a large, ongoing, "in production" feedback system. This randomized manipulation contained conditions which were assumed to improve the feedback system by gathering better data (less nonresponse, longer narrative answers). Hence, it is ethically implied to shift the whole feedback system towards the best experimental condition, as soon as there is enough evidence for this conditions superiority.   
+But despite the plausibility of this strategy it is very challenging to implement it using traditional research designs (e.g. randomized controlled trial) and frequentist statistics. Remember that in a best practice version the Neyman-Pearson procedure requires to _1)_ define a minimal meaningful effect size, _2)_ define the tolerated false-positive rate $\alpha$, _3)_ run an a priori power analysis based on a data analysis model and the results of the two previous steps, _4)_ run the study and _5)_ compute the p-value and reject $H_0$ if $p < \alpha$ [@cohen1988]. Henceforward, this procedure is called Null-Hypothesis Significance Testing with a priori Power Analysis [NHST-PA; @schonbrodt2017]. The challenge of applying this procedure to the problem at hand, lies in the fact, that the NHST-PA is a so called fixed-n sampling design [@stefan2019], meaning that the sample size has to be predetermined and a optional stopping or continuation of data collection in dependence of the intermediate results invalidates the interpretation of resulting p-values or the confidence intervals [@lai2012].  
+However statisticians have developed several extensions of the NHST-PA which allows to achieve correct p-values while looking repeatedly into the data and deciding about further data collection in dependece to the interim results (sequential design). The most common of such sequential designs is the so called group sequential (GS) design [@lai2012]. GS allows for a controlled over all Type I error rate with interim tests (e.g. $n_1 = 250$, $n_2 = 500$, $n_3 = 750$) and a final test (e.g. $n_{fin} = 1000$) even when researchers optionally stop the data collection after a interim test, depending on the results. However, planning a GS, requires researchers to prespecify all interim tests before the data collection starts [@proschan2006].  
+For the current problem GS are not suitable, as the data occurs in blocks (per course) which sizes are not susceptible to reseachers. Hence, we decided to use a Sequential Bayes Factor Design [SBF, @schonbrodt2017c]. The SBF is based on Bayesian Hypothesis Testing and uses the Bayes Factors (BFs) as measure of evidence. BFs are formally defined as $BF_{10}=\frac{p(D|H_0)}{p(D|H_A)}$ and hence express to what extend given data is more compatible to $H_0$ or $H_A$. 
+The SBF ca be described as a procedure with the following steps: _1)_ A priori definition of a treshold of evidence (e.g. $BF_{10} = 10$). _2)_ Description of the plausibility of effect sizes under $H_A$ (prior distribution of effects). _3)_ Data collection for a minimum sample size. _4)_ Alternating calculation of the BF and arbitrary increase of sample size. The last step means, that using SBF researchers can do sequential sampling in a really flexible way. E.g. in a lab study it may make sense, to calculate the BF after each participant, whereas in the current studies it seems to be appropriate to calculate the BF after each evaluated course.  
+Overall, SBF is a flexible method, which allows researchers to monitor the emerging evidence while data is accumulating, and optionally stop the experiment when the evidence exeeds a predefined level. Thereby no Type I error inflation occurs [@rouder2014] and no predefinition of effect sizes is necessary.
+
+# General Method
+Two studies with SBF ... one exploratory and one extended replication ...
+
+
+# Study 1
+## Design  
+In Study 1, we investigated the research questions using a 2x2 between-person design: The first experimental factor was the _position_ of the OEQ within the questionnaire with the two steps _at the beginning_ of the questionnaire and _at the end_ of the questionnaire. The second factor was the presence of an additional _motivating introduction to the question stem_ with the steps _additional motivating introduction_ and _no introduction_.
+
+## Procedure and Materials
+After the fourth day of their five days lasting course, students were asked to fill out a questionnaire to give the teacher and the school feedback about the lessons. The questionnaire contained the items of the SEEQ and two OEQ about instructional quality (see section [Measuremets](#measurements)). Students used their own mobile phones for the survey and were given course specific short link which resulted in a customized survey which mentioned the name of the respective teacher in the introduction and some items (e.g. _TEACHERNAME encourages students to participate in class discussions_). 
+
+## Participants
+```{r data-wrangling-s1, cache = T}
+# raw data experiment 1 ###############################################################
+## import data from suf
+data_s1 <- read_csv("data/eva_data_OEQexperimentI.csv")%>%
+  mutate(answer_text_isna = is.na(answer_text),
+         answert_text_isna_or_length0 = ifelse(answer_text_isna == T, T,
+                                         nchar(answer_text) == 0),
+         no_oeq_answer = ifelse(question_id %in% c(47:48), answer_text_isna, NA),
+         question_id_fac = as.factor(question_id),
+         position = ifelse(survey_id %in% c(2,3), "at the beginning", "at the end"),
+         instruction = ifelse(survey_id %in% c(2,5), "motivating instruction", "neutral instruction"),
+         oeq_answerlengthifgiven = ifelse(no_oeq_answer == T, NA, nchar(answer_text)),
+         oeq_answerlengthifgiven_log = log(oeq_answerlengthifgiven))%>%
+  group_by(class_id, question_id)%>%
+  mutate(oeq_answer_classprop = 1 - mean(no_oeq_answer, na.rm = T),
+         oeq_answerlengthifgiven_perclass = sum(nchar(answer_text), na.rm = T)/(n()-sum(no_oeq_answer)))%>%
+  ungroup()
+```
+
+
+```{r data-wrangling-s1-sentiments, cache = T}
+# lexica for sentiments ###############################################################
+# reading and parsing negative words
+neg_df <- read_tsv("data/SentiWS_v2.0_Negative.txt", col_names = FALSE)
+names(neg_df) <- c("Wort_POS", "Wert", "Inflektionen")
+neg_df <- neg_df %>% 
+  mutate(Wort = str_sub(Wort_POS, 1, regexpr("\\|", .$Wort_POS)-1),
+         POS = str_sub(Wort_POS, start = regexpr("\\|", .$Wort_POS)+1))
+# reading and parsing positive words
+pos_df <- read_tsv("data/SentiWS_v2.0_Positive.txt", col_names = FALSE)
+names(pos_df) <- c("Wort_POS", "Wert", "Inflektionen")
+pos_df <- pos_df %>% 
+  mutate(Wort = str_sub(Wort_POS, 1, regexpr("\\|", .$Wort_POS)-1),
+         POS = str_sub(Wort_POS, start = regexpr("\\|", .$Wort_POS)+1))
+# merging positive and negative words
+sentiment_lex_df <- bind_rows("neg" = neg_df, "pos" = pos_df, .id = "neg_pos")
+sentiment_lex_df <- sentiment_lex_df %>% 
+  select(neg_pos, Wort, Wert, Inflektionen, -Wort_POS)%>%
+  unnest_tokens(word, Inflektionen)
+
+# computing the sentiments ############################################################
+data_s1_sentiments <- data_s1%>%
+  filter(question_id > 46)%>%
+  select(respondent_hash, answer_text, question_id)%>%
+  unnest_tokens(word, answer_text)%>%
+  na.omit()%>%
+  inner_join(sentiment_lex_df)%>%
+  group_by(respondent_hash, question_id)%>%
+  summarize(sentiment = mean(Wert, na.rm = T))%>%
+  ungroup()
+```
+
+
+```{r data-wrangling-s1-cfa-data, cache = T}
+# pivoting to wide data frame with seeq data for CFA ##################################
+# Due to technical issues there are some nonunique entries per student and variables
+# These were remove with the following function
+paste_na_function <- function(x) ifelse(length(unique(na.omit(x))) > 1, NA, mean(x))
+
+data_s1_seeq <- data_s1%>%
+  select(respondent_hash, answer_integer, class_id, teacher_id, question_id)%>%
+  filter(question_id %in% c(1:20))%>%
+  unique(.)%>%
+  pivot_wider(
+    names_from = question_id,
+    values_from = answer_integer,
+    values_fn = list(answer_integer = paste_na_function)
+  )%>%
+  mutate(v1 = `1`, v2 = `2`, v3 = `3`, v4 = `4`, v5 = `5`, v6 = `6`, v7 = `7`, v8 = `8`, 
+         v9 = `9`, v10 = `10`, v11 = `11`, v12 = `12`, v13 = `13`, v14 = `14`, v15 = `15`, 
+         v16 = `16`, v17 = `17`, v18 = `18`, v19 = `19`, v20 = `20`,
+         Learning = rowMeans(data.frame(v1, v2, v3, v4), na.rm = T),
+         Ethusiasm = rowMeans(data.frame(v5, v6, v7, v8), na.rm = T),
+         Organisation = rowMeans(data.frame(v9, v10, v11, v12), na.rm = T),
+         `Group Interaction` = rowMeans(data.frame(v14, v15, v16, v17), na.rm = T),
+         `Individual Rapport` = rowMeans(data.frame(v18, v19, v20), na.rm = T))
+  
+```
+
+
+## Measurements {#measurements}
+### SEEQ
+We assessed the instructional quality using an adapted version of the Students’ Evaluations of Educational Quality questionnaire [SEEQ, @marsh1982]. ...
+```{r mcfa-seeq-s1, cache = T}
+cfa_seeq_s1_mod <- '
+         Learning =~ v1 + v2 + v3 + v4
+         Ethusiasm =~ v5 + v6 + v7 + v8
+         Organisation =~ v9 + v10 + v11 + v12
+         Interaction =~ v14 + v15 + v16 + v17
+         Rapport =~ v18 + v19 + v20
+         v5 ~~  v6
+         v11 ~~ v12
+         v3 ~~  v4
+         v15 ~~ v17
+         v14 ~~ v16'
+
+cfa_seeq_s1_fit <- cfa(cfa_seeq_s1_mod, data = data_s1_seeq)
+cfa_seeq_s1_svy_des <- svydesign(ids=~class_id, prob=~1, data=data_s1_seeq)
+cfa_seeq_s1_fit_svy <- lavaan.survey(cfa_seeq_s1_fit, cfa_seeq_s1_svy_des)
+
+fpf_la(cfa_seeq_s1_fit_svy)
+```
+
+### Open-ended Questions
+The two OEQ of the survey were _What has TEACHERNAME done especially well?///What is it TEACHERNAME did particularly well (this lesson)? _ and _What could TEACHERNAME do better in future?///What could TEACHERNAME improve in the future?_. Over all questions and experimental conditions, 
+`r length(data_s1%>%filter(question_id %in% c(47,48) & no_oeq_answer == F)%>%.$answer_text)/data_s1%>%filter(question_id %in% c(47,48))%>%nrow()*100`% 
+of students gave answers, which were at average `r table(nchar(data_s1%>%filter(no_oeq_answer == F)%>%.$answer_text))` characters long.
+
+
+## Statistical analysis
+```{r script_BF_kend_tau}
+# Prior specification Kendall's Tau
+scaledBetaTau <- function(tau, alpha=1, beta=1){
+  result <-   ((pi*2^(-2*alpha))/beta(alpha,alpha))  * cos((pi*tau)/2)^(2*alpha-1)
+  return(result)
+}
+
+priorTau <- function(tau, kappa){
+  scaledBetaTau(tau, alpha = (1/kappa), beta = (1/kappa))
+}
+
+priorTauPlus <- function(tau, kappa=1) {
+  non.negative.index <- tau >=0
+  less.than.one.index <- tau <=1
+  value.index <- as.logical(non.negative.index*less.than.one.index)
+  result <- tau*0
+  result[value.index] <- 2*priorTau(tau[value.index], kappa)
+  return(result)
+}
+
+priorTauMin <- function(tau, kappa=1) {
+  negative.index <- tau <=0
+  greater.than.min.one.index <- tau >= -1
+  value.index <- as.logical(negative.index*greater.than.min.one.index)
+  result <- tau*0
+  result[value.index] <- 2*priorTau(tau[value.index], kappa)
+  return(result)
+}
+
+
+# Posterior specification Kendall's Tau
+postDensKendallTau <- function(delta,Tstar,n,kappa=1,var=var,test="two-sided"){ 
+  if(test == "two-sided"){priorDens <- priorTau(delta,kappa)
+  } else if(test == "positive"){priorDens <- priorTauPlus(delta,kappa)
+  } else if(test == "negative"){priorDens <- priorTauMin(delta,kappa)}
+  priorDens <- priorTau(delta,kappa)
+  dens <- dnorm(Tstar,(1.5*delta*sqrt(n)),sd=sqrt(var))* priorDens
+  return(dens)
+}
+posteriorTau <- function(delta,kentau,n,kappa=1,var=1,test="two-sided"){
+  Tstar <- (kentau * ((n*(n-1))/2))/sqrt(n*(n-1)*(2*n+5)/18)
+  var <- min(1,var)
+  if(test == "two-sided"){lims <- c(-1,1)
+  } else if(test == "positive"){lims <- c(0,1)
+  } else if(test == "negative"){lims <- c(-1,0)}
+  logicalCensor <- (delta >= lims[1] & delta <= lims[2])
+  dens <- logicalCensor*postDensKendallTau(delta,Tstar,n,kappa,var,test=test)/
+    integrate(function(delta){postDensKendallTau(delta,Tstar,n,kappa,var,test=test)},lims[1],lims[2])$value
+} 
+
+# Bayes factor computation Kendall's Tau
+bfCorrieKernelKendallTau <- function(tau, n, kappa=1, var=1, ciValue=0.95){ 
+  tempList <- list(vector())
+  output <- list(n=n, r=tau, bf10=NA, bfPlus0=NA, bfMin0=NA)
+  output$bf10 <- priorTau(0,kappa)/posteriorTau(0,tau,n,kappa=kappa,var=var,test="two-sided")
+  output$bfPlus0 <- priorTauPlus(0,kappa)/posteriorTau(0,tau,n,kappa=kappa,var=var,test="positive")
+  output$bfMin0 <- priorTauMin(0,kappa)/posteriorTau(0,tau,n,kappa=kappa,var=var,test="negative")
+  return(output)
+}
+
+# Compute credible intervals kendalls tau
+credibleIntervalKendallTau <- function(kentau,n,kappa=1,var=1, test="two-sided", ciValue = 0.95){
+  nSeqs <- 1000
+  lowCI <- (1-ciValue)/2
+  upCI <- (1+ciValue)/2
+  taus <- seq(-1,1,length.out = (nSeqs-1))
+  densVals <- posteriorTau(taus, kentau, n, kappa = kappa, var = var, test = test)
+  densVals <- cumsum((densVals[1:(nSeqs-1)]+densVals[2:nSeqs])*0.5*(taus[2]-taus[1]))
+  lowerCI <- taus[which(densVals>=lowCI)[1]]
+  upperCI <- taus[which(densVals>=upCI)[1]]
+  median <- taus[which(densVals>=0.5)[1]]
+  return(list(lowerCI = lowerCI, median = median, upperCI = upperCI))
+}
+
+sampleTausA <- function(myTau,myN,nSamples = 3e3, var = 1){
+  nSeqs <- 1000
+  tauSamples <- NULL
+  taus <- seq(-1,1,length.out = nSeqs)
+  densVals <- posteriorTau(taus, myTau, myN, var = var)
+  ceiling <- max(densVals)
+  lowerB <- taus[which(round(densVals,digits=6) != 0 )][1]
+  upperB <- rev(taus[which(round(densVals,digits=6) != 0 )])[1]
+  
+  while(length(tauSamples) < nSamples){
+    prop <- runif(1,lowerB,upperB)
+    propDens <- posteriorTau(prop, myTau, myN, var = var)
+    if(propDens > runif(1,0,ceiling)){tauSamples <- c(tauSamples,prop)}
+  }
+  return(tauSamples)
+}
+
+```
+
+
+### GLobal Picture
+```{r}
+# no_oeq_answer: dichotomous
+ggplot(data_s1%>%
+         filter(question_id %in% c(47,48)), aes(position, as.numeric(no_oeq_answer), color = instruction)) + 
+  stat_summary(position = position_dodge(width=0.25)) +
+  coord_cartesian(ylim = c(0, 1))
+
+# no_oeq_answer: classwise aggregations
+ggplot(data_s1%>%
+         filter(question_id %in% c(47,48)), aes(position, as.numeric(oeq_answer_classprop), color = instruction)) + 
+  
+  stat_summary(position = position_dodge(width=0.25)) 
+
+# answertextlenth: level-1
+ggplot(data_s1%>%
+         filter(question_id %in% c(47,48)), aes(position, oeq_answerlengthifgiven_log, color = instruction)) + geom_violin(fill = NA) +
+  stat_summary(position = position_dodge(width=.9)) 
+
+```
+
+### first attempt: fixed-n-like
+```{r}
+# oeq_answerlengthifgiven_log ~ 
+data_s1_length_per_respond <- data_s1%>%
+  group_by(respondent_hash)%>%
+  summarize(oeq_answerlengthifgiven_log_per_resp = mean(oeq_answerlengthifgiven_log, na.rm = T))%>%
+  ungroup()%>%
+  na.omit(.)%>%
+  left_join(data_s1%>%select(respondent_hash, position, instruction)%>%unique())
+
+aswerlength_mod_instr <- 
+  lmBF(formula = oeq_answerlengthifgiven_log_per_resp ~ instruction,
+data = data_s1_length_per_respond)
+
+aswerlength_mod_pos <- 
+  lmBF(formula = oeq_answerlengthifgiven_log_per_resp ~ position,
+data = data_s1_length_per_respond)
+
+effsize::VD.A(data_s1_length_per_respond$oeq_answerlengthifgiven_log_per_resp ~
+                data_s1_length_per_respond$position)
+effsize::VD.A(data_s1_length_per_respond$oeq_answerlengthifgiven_log_per_resp ~
+                data_s1_length_per_respond$instruction)
+
+# contingencyTableBF: no_oeq_answer_ord ~ survey_id 
+data_s1_contigency_no_answer <- data_s1%>%
+  filter(question_id %in% c(47,48))%>%
+  group_by(respondent_hash, survey_id)%>%
+  summarize(no_oeq_answer_ord = sum(no_oeq_answer, na.rm = T))%>%
+  ungroup()%>%
+  left_join(data_s1%>%select(respondent_hash, position, instruction)%>%unique())%>%
+  mutate(total_no_oeq_answer = no_oeq_answer_ord == 0)
+
+contingencyTableBF(table(data_s1_contigency_no_answer$survey_id,  
+                         data_s1_contigency_no_answer$no_oeq_answer_ord),
+                   sampleType = "poisson")
+
+effsize::VD.A(data_s1_contigency_no_answer$no_oeq_answer_ord ~
+                data_s1_contigency_no_answer$position)
+
+DescTools::OddsRatio(table(data_s1_contigency_no_answer$total_no_oeq_answer, 
+                           data_s1_contigency_no_answer$position))
+```
+
+
+## Results
+
+
+
+
+# Study 2
+
+## Design and Procedure 
+Both 
+
+
+## Participants
+
+## Measurement
+
+## Statistical analysis
+
+## Results
+
+# Discussion
+
+
+\newpage
+
+# References
+```{r create_r-references}
+r_refs(file = "bib/r-references.bib")
+```
+
+\begingroup
+\setlength{\parindent}{-0.5in}
+\setlength{\leftskip}{0.5in}
+
+<div id = "refs"></div>
+\endgroup
