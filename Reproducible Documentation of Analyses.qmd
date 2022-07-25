@@ -2,14 +2,18 @@
 title: "Reproducible Documentation of Analyses"
 author: "Sonja Hahn, Samuel Merk"
 format: html
+execute:
+  cache: true
 ---
 
 ## Libraries
 ```{r loading libraries}
 #| message: false
+#| cache: false
 
 library(tidyverse)
 library(reactable)
+library(naniar)
 ```
 
 
@@ -20,8 +24,12 @@ The raw data of the study blalablalba you can download it `r xfun::embed_file("d
 Itemcodes:
 
 ```{r}
+#| cache: false
+
 read_csv("data/question_keys_data.csv") |> 
   reactable()
+
+keys <- read.csv("data/question_keys_data.csv")
 ```
 
 
@@ -36,7 +44,7 @@ read_csv("data/question_keys_data.csv") |>
 data_s1 <- read_csv("data/eva_data_OEQexperimentI.csv")%>%
   mutate(answer_text_isna = is.na(answer_text),
          #die folgende Zeile macht effektiv das gleiche --> 
-         ## anpassen "sinnvolle Antwortlänge?"
+         ## ToDo: anpassen "sinnvolle Antwortlänge?" 
          answert_text_isna_or_length0 = ifelse(answer_text_isna == T, T,
                                          nchar(answer_text) == 0),
          no_oeq_answer = ifelse(question_id %in% c(47:48),
@@ -58,7 +66,24 @@ data_s1 <- read_csv("data/eva_data_OEQexperimentI.csv")%>%
   ungroup()
 ```
 
+# Datenexploration
+
+```{r}
+#| eval : false
+View(data_s1)
+
+names(data_s1)
+
+data_s1 |> select(question_id, survey_id) |> table()
+
+
+```
+
+
+
 #### SEEQ data
+
+
 ```{r data-wrangling-s1-cfa-data}
 #| cache: true
 
@@ -86,15 +111,54 @@ data_s1_seeq <- data_s1%>%
          `Group Interaction` = rowMeans(data.frame(v14, v15, v16, v17), na.rm = T),
          `Individual Rapport` = rowMeans(data.frame(v18, v19, v20), na.rm = T))
 ```
-
+ANMERKUNG (Sonja): Da sind weitere Items (ähnlich zum SEEQ) 
+und auch Angaben zu Schule etc. - wurden die später gestellt?
 
 ## Recoding
 
 Was zählt als **sinnvolle** Antwort?
+```{r}
+#| cache: true
+
+
+data_s1 |> filter(question_id %in% c(45:48)) |> 
+  select(answer_text) |> 
+  unique() |> 
+  mutate(l.answer = nchar(answer_text)) |> 
+  filter(l.answer <= 20) |> 
+  arrange(l.answer)  |>  View()
+
+
+# Welche sollen herausgenommen werden?
+
+# Zeichen
+# Lösche alle - / * . ? * • - — # Vorgehen beim InDiKo-Bericht
+
+del_character <- "[-/*.?*•—]"
+
+data_s1 |> 
+  mutate(answer_text_short = str_replace_all(answer_text, del_character, "")) |> 
+  select(starts_with("answer_text")) |> View()
+
+# Lange --> mit welcher Begründung ("nichts" vs. "Buch") 
+
+# Inhaltlich ("nichts"?) (das hängt etwas von unseren Hypothesen ab)
+
+# evtl. aufbereitete Antworten abspeichern
+
+
+```
+Oft steht sinngemäß "alles gut"
+
+evtl. positive und negative Antworten zusammenfügen (Idee: Wenn alles gut war, 
+sollte zumindest bei den positiven Aspekten was stehen); 
+das vereinfacht evtl. auch die folgenden Analysen (Messwdh. als weiteres Level
+in den Daten eliminiert)
+
 
 Wer bricht SEEQ ab?
 ```{r}
-# aller personen mit mindestens einem seeeq item
+# alle personen mit mindestens einem seeq item
 data_s1 |> 
   select(completed_survey_id, question_id, answer_integer) |> 
   filter(question_id %in% c(1:20)) |> 
@@ -106,5 +170,110 @@ data_s1 |>
 data_s1 |> 
   select(completed_survey_id) |> 
   distinct()
+
+# Missing auf einzelnen Variablen
+data_s1_seeq |> 
+  select(v1:v20) |> 
+  gg_miss_var()
+# Wollen wir da was machen, oder lediglich berichten (55/3163 sind recht wenig,
+# zumal zwar eine Tendenz vorhanden ist, gegen Ende mehr auszulassen, aber
+# das nicht komplett systematisch ist, Personen einfach weiterblättern können etc.)
 ```
+
+
+
+
+
+
+## Deskriptive Analyse
+
+Over all questions and experimental conditions, 
+`r length(data_s1%>%filter(question_id %in% c(47,48) & no_oeq_answer == F)%>%.$answer_text)/data_s1%>%filter(question_id %in% c(47,48))%>%nrow()*100`% 
+of students gave answers, which were at average `r table(nchar(data_s1%>%filter(no_oeq_answer == F)%>%.$answer_text))` characters long.
+
+
+### GLobal Picture
+```{r}
+# no_oeq_answer: dichotomous
+ggplot(data_s1%>%
+         filter(question_id %in% c(47,48)), aes(position, as.numeric(no_oeq_answer), color = instruction)) + 
+  stat_summary(position = position_dodge(width=0.25)) +
+  coord_cartesian(ylim = c(0, 1))
+
+# no_oeq_answer: classwise aggregations
+ggplot(data_s1%>%
+         filter(question_id %in% c(47,48)), aes(position, as.numeric(oeq_answer_classprop), color = instruction)) + 
+  
+  stat_summary(position = position_dodge(width=0.25)) 
+
+# answertextlenth: level-1
+ggplot(data_s1%>%
+         filter(question_id %in% c(47,48)), aes(position, oeq_answerlengthifgiven_log, color = instruction)) + geom_violin(fill = NA) +
+  stat_summary(position = position_dodge(width=.9)) 
+
+```
+
+### first attempt: fixed-n-like
+```{r}
+#| eval: false
+
+# oeq_answerlengthifgiven_log ~ 
+data_s1_length_per_respond <- data_s1%>%
+  group_by(respondent_hash)%>%
+  summarize(oeq_answerlengthifgiven_log_per_resp = mean(oeq_answerlengthifgiven_log, na.rm = T))%>%
+  ungroup()%>%
+  na.omit(.)%>%
+  left_join(data_s1%>%select(respondent_hash, position, instruction)%>%unique())
+
+aswerlength_mod_instr <- 
+  lmBF(formula = oeq_answerlengthifgiven_log_per_resp ~ instruction,
+data = data_s1_length_per_respond)
+
+aswerlength_mod_pos <- 
+  lmBF(formula = oeq_answerlengthifgiven_log_per_resp ~ position,
+data = data_s1_length_per_respond)
+
+effsize::VD.A(data_s1_length_per_respond$oeq_answerlengthifgiven_log_per_resp ~
+                data_s1_length_per_respond$position)
+effsize::VD.A(data_s1_length_per_respond$oeq_answerlengthifgiven_log_per_resp ~
+                data_s1_length_per_respond$instruction)
+
+# contingencyTableBF: no_oeq_answer_ord ~ survey_id 
+data_s1_contigency_no_answer <- data_s1%>%
+  filter(question_id %in% c(47,48))%>%
+  group_by(respondent_hash, survey_id)%>%
+  summarize(no_oeq_answer_ord = sum(no_oeq_answer, na.rm = T))%>%
+  ungroup()%>%
+  left_join(data_s1%>%select(respondent_hash, position, instruction)%>%unique())%>%
+  mutate(total_no_oeq_answer = no_oeq_answer_ord == 0)
+
+contingencyTableBF(table(data_s1_contigency_no_answer$survey_id,  
+                         data_s1_contigency_no_answer$no_oeq_answer_ord),
+                   sampleType = "poisson")
+
+effsize::VD.A(data_s1_contigency_no_answer$no_oeq_answer_ord ~
+                data_s1_contigency_no_answer$position)
+
+DescTools::OddsRatio(table(data_s1_contigency_no_answer$total_no_oeq_answer, 
+                           data_s1_contigency_no_answer$position))
+```
+
+
+## Inferenzstatistische Tests (Basic, für beide UVs)
+
+Chi-2-Test (AV: Missing in OEI)
+```{r}
+
+```
+
+MWU-Test (AV: Antwortlänge)
+```{r}
+
+```
+
+## Komplexere Modelle
+
+Truncated + Poisson-Verteilung
+
+
 
