@@ -14,6 +14,7 @@ execute:
 library(tidyverse)
 library(reactable)
 library(naniar)
+library(brms)
 ```
 
 
@@ -192,88 +193,70 @@ Over all questions and experimental conditions,
 of students gave answers, which were at average `r table(nchar(data_s1%>%filter(no_oeq_answer == F)%>%.$answer_text))` characters long.
 
 
-### GLobal Picture
+### Global Picture
 ```{r}
 # no_oeq_answer: dichotomous
-ggplot(data_s1%>%
-         filter(question_id %in% c(47,48)), aes(position, as.numeric(no_oeq_answer), color = instruction)) + 
-  stat_summary(position = position_dodge(width=0.25)) +
+ggplot(
+  data_s1 %>%
+    filter(question_id %in% c(47, 48)) %>% View(),
+  aes(position, as.numeric(no_oeq_answer), color = instruction)
+) +
+  stat_summary(position = position_dodge(width = 0.25)) +
   coord_cartesian(ylim = c(0, 1))
 
 # no_oeq_answer: classwise aggregations
-ggplot(data_s1%>%
-         filter(question_id %in% c(47,48)), aes(position, as.numeric(oeq_answer_classprop), color = instruction)) + 
-  
-  stat_summary(position = position_dodge(width=0.25)) 
+ggplot(
+  data_s1 %>%
+    filter(question_id %in% c(47, 48)),
+  aes(position, as.numeric(oeq_answer_classprop), color = instruction)
+) +
+  stat_summary(position = position_dodge(width = 0.25)) 
 
 # answertextlenth: level-1
-ggplot(data_s1%>%
-         filter(question_id %in% c(47,48)), aes(position, oeq_answerlengthifgiven_log, color = instruction)) + geom_violin(fill = NA) +
-  stat_summary(position = position_dodge(width=.9)) 
+ggplot(
+  data_s1 %>%
+    filter(question_id %in% c(47, 48)),
+  aes(position, oeq_answerlengthifgiven_log, color = instruction)
+) + geom_violin(fill = NA) +
+  stat_summary(position = position_dodge(width = .9)) 
 
 ```
 
-### first attempt: fixed-n-like
+aktueller Plan: Grafiken beschrieben und darasu ableiten weshab die Mehrebenstruktur einfache approaches wie chi^2 oder MWU problematisch macht.
+
+## Zero-Inlated Poisson-Regression
+
 ```{r}
-#| eval: false
+# generate data
+data_poisson <- 
+  data_s1 %>% 
+  filter(question_id %in% c(47, 48)) %>% 
+  mutate(answerlength_incl_zero = ifelse(answer_text_isna == T, 0,
+                                         ifelse(oeq_answerlengthifgiven == 1, 0, 
+                                                oeq_answerlengthifgiven)))
 
-# oeq_answerlengthifgiven_log ~ 
-data_s1_length_per_respond <- data_s1%>%
-  group_by(respondent_hash)%>%
-  summarize(oeq_answerlengthifgiven_log_per_resp = mean(oeq_answerlengthifgiven_log, na.rm = T))%>%
-  ungroup()%>%
-  na.omit(.)%>%
-  left_join(data_s1%>%select(respondent_hash, position, instruction)%>%unique())
+# look at the distribution
+ggplot(data_poisson, aes(answerlength_incl_zero)) +
+  geom_histogram(binwidth = 1)
 
-aswerlength_mod_instr <- 
-  lmBF(formula = oeq_answerlengthifgiven_log_per_resp ~ instruction,
-data = data_s1_length_per_respond)
+ggplot(data_poisson, aes(answerlength_incl_zero)) +
+  geom_density()
 
-aswerlength_mod_pos <- 
-  lmBF(formula = oeq_answerlengthifgiven_log_per_resp ~ position,
-data = data_s1_length_per_respond)
+ggplot(data_poisson, aes(answerlength_incl_zero)) +
+  geom_histogram(binwidth = 1) +
+  coord_cartesian(xlim = c(0,50), ylim = c(0, 200))
 
-effsize::VD.A(data_s1_length_per_respond$oeq_answerlengthifgiven_log_per_resp ~
-                data_s1_length_per_respond$position)
-effsize::VD.A(data_s1_length_per_respond$oeq_answerlengthifgiven_log_per_resp ~
-                data_s1_length_per_respond$instruction)
+mod0 <- brm(answerlength_incl_zero ~ 1 + (1|respondent_hash),
+            family = zero_inflated_poisson(),
+            data = data_poisson)
 
-# contingencyTableBF: no_oeq_answer_ord ~ survey_id 
-data_s1_contigency_no_answer <- data_s1%>%
-  filter(question_id %in% c(47,48))%>%
-  group_by(respondent_hash, survey_id)%>%
-  summarize(no_oeq_answer_ord = sum(no_oeq_answer, na.rm = T))%>%
-  ungroup()%>%
-  left_join(data_s1%>%select(respondent_hash, position, instruction)%>%unique())%>%
-  mutate(total_no_oeq_answer = no_oeq_answer_ord == 0)
+mod1 <- brm(answerlength_incl_zero ~ 1 + position + (1|respondent_hash),
+            family = zero_inflated_poisson(),
+            data = data_poisson)
 
-contingencyTableBF(table(data_s1_contigency_no_answer$survey_id,  
-                         data_s1_contigency_no_answer$no_oeq_answer_ord),
-                   sampleType = "poisson")
-
-effsize::VD.A(data_s1_contigency_no_answer$no_oeq_answer_ord ~
-                data_s1_contigency_no_answer$position)
-
-DescTools::OddsRatio(table(data_s1_contigency_no_answer$total_no_oeq_answer, 
-                           data_s1_contigency_no_answer$position))
+sjPlot::tab_model(mod0, mod1)
 ```
 
-
-## Inferenzstatistische Tests (Basic, für beide UVs)
-
-Chi-2-Test (AV: Missing in OEI)
-```{r}
-
-```
-
-MWU-Test (AV: Antwortlänge)
-```{r}
-
-```
-
-## Komplexere Modelle
-
-Truncated + Poisson-Verteilung
 
 
 
