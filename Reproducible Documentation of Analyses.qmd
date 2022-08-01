@@ -198,11 +198,11 @@ of students gave answers, which were at average `r table(nchar(data_s1%>%filter(
 # no_oeq_answer: dichotomous
 ggplot(
   data_s1 %>%
-    filter(question_id %in% c(47, 48)) %>% View(),
+    filter(question_id %in% c(47, 48)),
   aes(position, as.numeric(no_oeq_answer), color = instruction)
 ) +
   stat_summary(position = position_dodge(width = 0.25)) +
-  coord_cartesian(ylim = c(0, 1))
+    coord_cartesian(ylim = c(0, 1))
 
 # no_oeq_answer: classwise aggregations
 ggplot(
@@ -222,7 +222,8 @@ ggplot(
 
 ```
 
-aktueller Plan: Grafiken beschrieben und darasu ableiten weshab die Mehrebenstruktur einfache approaches wie chi^2 oder MWU problematisch macht.
+aktueller Plan: Grafiken beschrieben und daraus ableiten, weshalb die 
+Mehrebenstruktur einfache approaches wie chi^2 oder MWU problematisch macht.
 
 ## Zero-Inlated Poisson-Regression
 
@@ -234,6 +235,9 @@ data_poisson <-
   mutate(answerlength_incl_zero = ifelse(answer_text_isna == T, 0,
                                          ifelse(oeq_answerlengthifgiven == 1, 0, 
                                                 oeq_answerlengthifgiven)))
+# Das ergibt pro Item die Antwortlänge, d.h. noch geschachtelt in der Person
+
+
 
 # look at the distribution
 ggplot(data_poisson, aes(answerlength_incl_zero)) +
@@ -246,17 +250,118 @@ ggplot(data_poisson, aes(answerlength_incl_zero)) +
   geom_histogram(binwidth = 1) +
   coord_cartesian(xlim = c(0,50), ylim = c(0, 200))
 
+ggplot(data_poisson, aes(answerlength_incl_zero)) +
+  geom_histogram(binwidth = 1) +
+  coord_cartesian(xlim = c(0,50), ylim = c(0, 400))+
+  facet_wrap(vars(question_id)) 
+
+
 mod0 <- brm(answerlength_incl_zero ~ 1 + (1|respondent_hash),
-            family = zero_inflated_poisson(),
+            family = zero_inflated_poisson(), # zero_inflated_poisson(link = "log", link_zi = "logit")
             data = data_poisson)
 
 mod1 <- brm(answerlength_incl_zero ~ 1 + position + (1|respondent_hash),
             family = zero_inflated_poisson(),
             data = data_poisson)
 
+
+
 sjPlot::tab_model(mod0, mod1)
+
+# https://bookdown.org/ajkurz/Statistical_Rethinking_recoded/monsters-and-mixtures.html#example-zero-inflated-poisson.
+# Kein Multilevel
+
+# b11.4 <- 
+#   brm(data = d, family = zero_inflated_poisson,
+#       Y ~ 1,
+#       prior = c(prior(normal(0, 10), class = Intercept), # Poisson? lambda?
+#                 prior(beta(2, 2), class = zi)),  # zi: ZeroInflated (p_i), default beta(1,1)
+#       cores = 4,
+#       seed = 11) 
+
+# print(b11.4)
+
 ```
 
+https://fcorowe.github.io/countdata_modelling/ 
+
+Was mir an den folgenden Modellen noch nicht gefällt: 
+
+1. könnte man evtl. auf die overdispersed distributions umsteigen, um zusätzliche Clusterungen abzufangen
+What causes overdispersion? Overdispersion is caused by positive correlation between responses or by an excess variation between response probabilities or counts. Overdispersion also arises when there are violations in the distributional assumptions of the data, such as when the data are clustered and thereby violate the likelihood independence of observations assumption.--> Zero-inflated Negative Binomial regression; oder besser modellieren
+2. sind keine uVs im zero-Inflation Teil drin.
+```{r}
+#| eval = FALSE
+
+library(lme4)
+library(merTools)
+library(glmmTMB) # fitting generalised linear mixed models
+library(bbmle)
+
+
+# Owls <- transform(Owls,
+#                   Nest = reorder(Nest,NegPerChick),
+#                   NCalls = SiblingNegotiation,
+#                   FT = FoodTreatment)
+# 
+# eq <- NCalls ~ (FT + ArrivalTime) * SexParent + offset( log( BroodSize)) + ( 1 | Nest)
+# 
+# zipoisson1 <- glmmTMB(eq,
+#                       data=Owls,
+#                       ziformula=~1,
+#                       family=poisson)
+# summary(zipoisson1)
+
+mod_0 <- glmmTMB(answerlength_incl_zero ~ 1 +  (1|respondent_hash),
+            data = data_poisson,
+            ziformula =~ 1,
+            family = poisson)
+
+summary(mod_0)
+
+mod_position <- glmmTMB(answerlength_incl_zero ~ 1 + position + (1|respondent_hash),
+            data = data_poisson,
+            ziformula =~ 1,
+            family = poisson)
+
+summary(mod_position)
+
+mod_instruction <- glmmTMB(answerlength_incl_zero ~ 1 + instruction + (1|respondent_hash),
+            data = data_poisson,
+            ziformula =~ 1,
+            family = poisson)
+
+summary(mod_instruction)
+
+mod_instruction_position <- glmmTMB(answerlength_incl_zero ~ 1 + instruction + position + (1|respondent_hash),
+            data = data_poisson,
+            ziformula =~ 1,
+            family = poisson)
+
+summary(mod_instruction_position)
+```
+
+
+https://fukamilab.github.io/BIO202/04-C-zero-data.html#zero-inflated_poisson_glm 
+```{r}
+library(pscl)
+M3 <- zeroinfl(answerlength_incl_zero ~ instruction + position | ## Predictor for the Poisson process
+                 1, ## Predictor for the Bernoulli process;
+               dist = 'poisson',
+               data = data_poisson |> filter(question_id == 47))
+
+
+summary(M3)
+
+M3 <- zeroinfl(answerlength_incl_zero ~ instruction + position | ## Predictor for the Poisson process
+                 instruction + position, ## Predictor for the Bernoulli process;
+               dist = 'poisson',
+               data = data_poisson |> filter(question_id == 47))
+
+
+summary(M3)
+
+```
 
 
 
