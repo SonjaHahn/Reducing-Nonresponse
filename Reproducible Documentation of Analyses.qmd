@@ -255,16 +255,54 @@ ggplot(data_poisson, aes(answerlength_incl_zero)) +
   coord_cartesian(xlim = c(0,50), ylim = c(0, 400))+
   facet_wrap(vars(question_id)) 
 
-
+###############
+# null modell mit person als clustervariable
 mod0 <- brm(answerlength_incl_zero ~ 1 + (1|respondent_hash),
             family = zero_inflated_poisson(), # zero_inflated_poisson(link = "log", link_zi = "logit")
             data = data_poisson)
 
-mod1 <- brm(answerlength_incl_zero ~ 1 + position + (1|respondent_hash),
-            family = zero_inflated_poisson(),
+# null modell mit Kursleiter als clustervariable
+mod00 <- brm(answerlength_incl_zero ~ 1 + (1|teacher_id),
+             family = zero_inflated_poisson(), # zero_inflated_poisson(link = "log", link_zi = "logit")
+             data = data_poisson)
+
+# null modell mit Kursleiter und person als clustervariable
+mod000 <- brm(answerlength_incl_zero ~ 1 + as.factor(question_id) + (1|respondent_hash + teacher_id),
+              family = zero_inflated_poisson(), # zero_inflated_poisson(link = "log", link_zi = "logit")
+              data = data_poisson)
+###################
+## weitere nächste Schritte:
+##   * Auf Server klonen
+##   * Backgroundjobs
+##   * Rhat interpretieren lernen und dann tunen mit Iterationenanzahl
+##   * Diverse Nullmodelle schätzen (siehe direkt darüber) und dann entscheiden
+##     welche Mehrebenestruktur modelliert wird
+
+
+
+
+# null modell mit person als clustervariable
+mod0 <- brm(answerlength_incl_zero ~ 1 + (1|respondent_hash),
+            family = zero_inflated_poisson(), # zero_inflated_poisson(link = "log", link_zi = "logit")
             data = data_poisson)
 
+# null modell mit Kursleiter als clustervariable
+mod00 <- brm(answerlength_incl_zero ~ 1 + (1|teacher_id),
+             family = zero_inflated_poisson(), # zero_inflated_poisson(link = "log", link_zi = "logit")
+             data = data_poisson)
 
+# Item als Prädiktor mit Kursleiter und person als clustervariable
+mod01a <- brm(answerlength_incl_zero ~ 1 +  (1|respondent_hash + teacher_id),
+              family = zero_inflated_poisson(), # zero_inflated_poisson(link = "log", link_zi = "logit")
+              data = data_poisson)
+
+mod1 <- brm(answerlength_incl_zero ~ 1 + position + (1|respondent_hash),
+            family = zero_inflated_poisson(),
+            data = data_poisson,
+            cores = 8,
+            iter = 4000)
+
+summary(mod1)
 
 sjPlot::tab_model(mod0, mod1)
 
