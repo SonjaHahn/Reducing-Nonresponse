@@ -27,7 +27,7 @@ Itemcodes:
 ```{r}
 #| cache: false
 
-read_csv("data/question_keys_data.csv") |> 
+read_csv("data/question_keys_data.csv") %>% 
   reactable()
 
 keys <- read.csv("data/question_keys_data.csv")
@@ -75,7 +75,7 @@ View(data_s1)
 
 names(data_s1)
 
-data_s1 |> select(question_id, survey_id) |> table()
+data_s1 %>% select(question_id, survey_id) %>% table()
 
 
 ```
@@ -122,12 +122,12 @@ Was zählt als **sinnvolle** Antwort?
 #| cache: true
 
 
-data_s1 |> filter(question_id %in% c(45:48)) |> 
-  select(answer_text) |> 
-  unique() |> 
-  mutate(l.answer = nchar(answer_text)) |> 
-  filter(l.answer <= 20) |> 
-  arrange(l.answer)  |>  View()
+data_s1 %>% filter(question_id %in% c(45:48)) %>% 
+  select(answer_text) %>% 
+  unique() %>% 
+  mutate(l.answer = nchar(answer_text)) %>% 
+  filter(l.answer <= 20) %>% 
+  arrange(l.answer)  %>%  View()
 
 
 # Welche sollen herausgenommen werden?
@@ -137,9 +137,9 @@ data_s1 |> filter(question_id %in% c(45:48)) |>
 
 del_character <- "[-/*.?*•—]"
 
-data_s1 |> 
-  mutate(answer_text_short = str_replace_all(answer_text, del_character, "")) |> 
-  select(starts_with("answer_text")) |> View()
+data_s1 %>% 
+  mutate(answer_text_short = str_replace_all(answer_text, del_character, "")) %>% 
+  select(starts_with("answer_text")) %>% View()
 
 # Lange --> mit welcher Begründung ("nichts" vs. "Buch") 
 
@@ -160,21 +160,21 @@ in den Daten eliminiert)
 Wer bricht SEEQ ab?
 ```{r}
 # alle personen mit mindestens einem seeq item
-data_s1 |> 
-  select(completed_survey_id, question_id, answer_integer) |> 
-  filter(question_id %in% c(1:20)) |> 
-  na.omit() |> 
-  select(completed_survey_id) |> 
+data_s1 %>% 
+  select(completed_survey_id, question_id, answer_integer) %>% 
+  filter(question_id %in% c(1:20)) %>% 
+  na.omit() %>% 
+  select(completed_survey_id) %>% 
   distinct()
 
 # alle personen
-data_s1 |> 
-  select(completed_survey_id) |> 
+data_s1 %>% 
+  select(completed_survey_id) %>% 
   distinct()
 
 # Missing auf einzelnen Variablen
-data_s1_seeq |> 
-  select(v1:v20) |> 
+data_s1_seeq %>% 
+  select(v1:v20) %>% 
   gg_miss_var()
 # Wollen wir da was machen, oder lediglich berichten (55/3163 sind recht wenig,
 # zumal zwar eine Tendenz vorhanden ist, gegen Ende mehr auszulassen, aber
@@ -386,7 +386,7 @@ library(pscl)
 M3 <- zeroinfl(answerlength_incl_zero ~ instruction + position | ## Predictor for the Poisson process
                  1, ## Predictor for the Bernoulli process;
                dist = 'poisson',
-               data = data_poisson |> filter(question_id == 47))
+               data = data_poisson %>% filter(question_id == 47))
 
 
 summary(M3)
@@ -394,7 +394,7 @@ summary(M3)
 M3 <- zeroinfl(answerlength_incl_zero ~ instruction + position | ## Predictor for the Poisson process
                  instruction + position, ## Predictor for the Bernoulli process;
                dist = 'poisson',
-               data = data_poisson |> filter(question_id == 47))
+               data = data_poisson %>% filter(question_id == 47))
 
 
 summary(M3)
