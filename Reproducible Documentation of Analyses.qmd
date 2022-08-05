@@ -260,7 +260,7 @@ ggplot(data_poisson, aes(answerlength_incl_zero)) +
 
 
 ```{r}
-
+#| eval : false
 
 ###############
 # null modell mit person als clustervariable
@@ -273,30 +273,68 @@ ggplot(data_poisson, aes(answerlength_incl_zero)) +
 #              family = zero_inflated_poisson(), # zero_inflated_poisson(link = "log", link_zi = "logit")
 #              data = data_poisson)
 # 
-# # null modell mit Kursleiter und person als clustervariable
-# mod000 <- brm(answerlength_incl_zero ~ 1 + as.factor(question_id) + (1|respondent_hash + teacher_id),
-#               family = zero_inflated_poisson(), # zero_inflated_poisson(link = "log", link_zi = "logit")
+# # null modell mit Kursleiter und person als clustervariable + questID
+mod000 <- brm(answerlength_incl_zero ~ 1 + as.factor(question_id) + (1|respondent_hash + teacher_id),
+              family = zero_inflated_poisson(), # zero_inflated_poisson(link = "log", link_zi = "logit")
+              data = data_poisson)
+
+# # null modell mit person als clustervariable + questID
+# mod000r <- brm(answerlength_incl_zero ~ 1 + as.factor(question_id) + (1|respondent_hash),
+#               family = zero_inflated_poisson(), 
 #               data = data_poisson)
 # ###################
 ## weitere nächste Schritte:
 ##   * Auf Server klonen
 ##   * Backgroundjobs -> https://github.com/sol-eng/background-jobs/tree/main/simulation-job
-##   * Rhat interpretieren lernen und dann tunen mit Iterationenanzahl
+##   * Rhat interpretieren lernen und dann tunen mit Iterationenanzahl 
+## -> (soll um 1 sein, entspricht ANOVA-F: Varianz within vs. between chains)
+## -> https://mc-stan.org/misc/warnings.html#r-hat: https://mc-stan.org/misc/warnings.html#r-hat:
+##    We recommend running at least four chains by default and in general only fully trust the sample if R-hat is less than 1.01. In early workflow, R-hat below 1.1 is often sufficient.
+## -> ESS soll möglichst groß sein
 ##   * Diverse Nullmodelle schätzen (siehe direkt darüber) und dann entscheiden
 ##     welche Mehrebenestruktur modelliert wird
+## -> mod000 scheint ok zu sein (keine Fehlermeldungen, R-hat < 1.1)
 
+# > BackgroundJobs_results$mod000
+#  Family: zero_inflated_poisson 
+#   Links: mu = log; zi = identity 
+# Formula: answerlength_incl_zero ~ 1 + as.factor(question_id) + (1 | respondent_hash + teacher_id) 
+#    Data: data_poisson (Number of observations: 6282) 
+#   Draws: 4 chains, each with iter = 2000; warmup = 1000; thin = 1;
+#          total post-warmup draws = 4000
+# 
+# Group-Level Effects: 
+# ~respondent_hash (Number of levels: 3141) 
+#               Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+# sd(Intercept)     0.73      0.01     0.71     0.75 1.02      204      387
+# 
+# ~teacher_id (Number of levels: 105) 
+#               Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+# sd(Intercept)     0.22      0.02     0.18     0.27 1.02      156      473
+# 
+# Population-Level Effects: 
+#                        Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+# Intercept                  4.25      0.03     4.20     4.30 1.01      274      641
+# as.factorquestion_id48    -0.35      0.00    -0.35    -0.34 1.00     6037     3281
+# 
+# Family Specific Parameters: 
+#    Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+# zi     0.23      0.01     0.22     0.24 1.00     2887     2706
+# 
+# Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
+# and Tail_ESS are effective sample size measures, and Rhat is the potential
+# scale reduction factor on split chains (at convergence, Rhat = 1).
 
+```
 
+Modellierung
 
-# null modell mit person als clustervariable
-mod0 <- brm(answerlength_incl_zero ~ 1 + (1|respondent_hash),
-            family = zero_inflated_poisson(), # zero_inflated_poisson(link = "log", link_zi = "logit")
-            data = data_poisson)
+```{r}
+# Next Steps: oben nochmal schauen, welches Modell
+# Prädiktorvariablen einpflegen (2 uVs, bei Länge und bei zi)
+# Interpretieren, evtl. sowas wie Modellvergleiche?
+# "Kreuzvalidierung" mit frequentistischer Methode
 
-# null modell mit Kursleiter als clustervariable
-mod00 <- brm(answerlength_incl_zero ~ 1 + (1|teacher_id),
-             family = zero_inflated_poisson(), # zero_inflated_poisson(link = "log", link_zi = "logit")
-             data = data_poisson)
 
 # Item als Prädiktor mit Kursleiter und person als clustervariable
 mod01a <- brm(answerlength_incl_zero ~ 1 +  (1|respondent_hash + teacher_id),
