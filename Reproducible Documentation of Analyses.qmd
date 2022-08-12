@@ -225,7 +225,7 @@ ggplot(
 aktueller Plan: Grafiken beschrieben und daraus ableiten, weshalb die 
 Mehrebenstruktur einfache approaches wie chi^2 oder MWU problematisch macht.
 
-## Zero-Inlated Poisson-Regression
+## Zero-Inflated Poisson-Regression
 
 ```{r}
 # generate data
@@ -237,7 +237,8 @@ data_poisson <-
                                                 oeq_answerlengthifgiven)))
 # Das ergibt pro Item die Antwortlänge, d.h. noch geschachtelt in der Person
 
-
+data_poisson <- data_poisson %>% 
+  mutate(motiv_cue = factor(instruction, levels = c("neutral instruction","motivating instruction"))) 
 
 # look at the distribution
 ggplot(data_poisson, aes(answerlength_incl_zero)) +
@@ -274,9 +275,9 @@ ggplot(data_poisson, aes(answerlength_incl_zero)) +
 #              data = data_poisson)
 # 
 # # null modell mit Kursleiter und person als clustervariable + questID
-mod000 <- brm(answerlength_incl_zero ~ 1 + as.factor(question_id) + (1|respondent_hash + teacher_id),
-              family = zero_inflated_poisson(), # zero_inflated_poisson(link = "log", link_zi = "logit")
-              data = data_poisson)
+# mod000 <- brm(answerlength_incl_zero ~ 1 + as.factor(question_id) + (1|respondent_hash + teacher_id),
+#               family = zero_inflated_poisson(), # zero_inflated_poisson(link = "log", link_zi = "logit")
+#               data = data_poisson)
 
 # # null modell mit person als clustervariable + questID
 # mod000r <- brm(answerlength_incl_zero ~ 1 + as.factor(question_id) + (1|respondent_hash),
@@ -327,13 +328,17 @@ mod000 <- brm(answerlength_incl_zero ~ 1 + as.factor(question_id) + (1|responden
 
 ```
 
-Modellierung
+Komplexere Modelle
 
 ```{r}
-# Next Steps: oben nochmal schauen, welches Modell
-# Prädiktorvariablen einpflegen (2 uVs, bei Länge und bei zi)
-# Interpretieren, evtl. sowas wie Modellvergleiche?
-# "Kreuzvalidierung" mit frequentistischer Methode
+# Next Steps
+#  * Prädiktorvariablen einpflegen (2 uVs, bei Länge und bei zi)
+#  * Interpretieren, evtl. sowas wie Modellvergleiche?
+#  * "Kreuzvalidierung" mit frequentistischer Methode
+
+# fit_zinb2<-brm(bf(count~persons+child+camper,zi~child), data=zinb,family=zero_inflated_poisson())
+
+
 
 
 # Item als Prädiktor mit Kursleiter und person als clustervariable
