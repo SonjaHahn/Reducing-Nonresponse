@@ -15,6 +15,8 @@ library(tidyverse)
 library(reactable)
 library(naniar)
 library(brms)
+library(glmmTMB)
+library(modelsummary)
 ```
 
 
@@ -75,7 +77,7 @@ View(data_s1)
 
 names(data_s1)
 
-data_s1 %>% select(question_id, survey_id) %>% table()
+#data_s1 %>% select(question_id, survey_id) %>% table()
 
 
 ```
@@ -258,6 +260,224 @@ ggplot(data_poisson, aes(answerlength_incl_zero)) +
 
 ```
 
+## sjplot ausprobieren
+```{r}
+# # https://strengejacke.github.io/sjPlot/articles/tab_bayes.html
+# # load required packages
+library(sjPlot)
+library(insight)
+library(httr)
+library(brms)
+# 
+# # m1 <- insight::download_model("brms_zi_2")
+# # 
+# # zinb <- read.csv("http://stats.idre.ucla.edu/stat/data/fish.csv")
+# # set.seed(123)
+# # m1 <- brm(bf(
+# #     count ~ persons + child + camper + (1 | persons),
+# #     zi ~ child + camper + (1 | persons)
+# #   ),
+# #   data = zinb,
+# #   family = zero_inflated_poisson()
+# # )
+# m1 <- insight::download_model("brms_zi_2")
+# 
+# m2 <- insight::download_model("brms_mv_3")
+# 
+# summary(m1)
+# 
+# tab_model(m1)
+# # Die unterscheiden sich, weil standardmäßig der Medien der posterior-distribution berichtet wird?
+# 
+# # zinb <- read.csv("http://stats.idre.ucla.edu/stat/data/fish.csv")
+# # set.seed(123)
+# # m1 <- brm(bf(
+# #     count ~ persons + child + camper + (1 | persons),
+# #     zi ~ child + camper + (1 | persons)
+# #   ),
+# #   data = zinb,
+# #   family = zero_inflated_poisson()
+# # )
+# 
+# # https://stats.stackexchange.com/questions/13166/rs-lmer-cheat-sheet
+# # https://bbolker.github.io/mixedmodels-misc/glmmFAQ.html#model-definition
+# # https://stats.stackexchange.com/questions/228800/crossed-vs-nested-random-effects-how-do-they-differ-and-how-are-they-specified
+# 
+# 
+# m1 <- brm(bf(
+#     answerlength_incl_zero ~  motiv_cue + (1 | teacher_id / respondent_hash),
+#     zi ~  motiv_cue + (1 | teacher_id / respondent_hash)
+#   ),
+#   data = data_poisson,
+#   family = zero_inflated_poisson()
+# )
+# 
+# summary(m1)
+# tab_model(m1)
+# 
+# # base_brms <- brm(bf(answerlength_incl_zero  ~ 1 + as.factor(question_id) +
+# #                                  (1|respondent_hash + teacher_id),
+# #                                zi ~ 1 + as.factor(question_id) +
+# #                                  (1|respondent_hash + teacher_id)),
+# #                             family = zero_inflated_poisson(), 
+# #                             data = data_poisson)
+# # saveRDS(base_brms,"base_brms.rds")
+
+```
+
+
+
+
+## GLM-Basierte Methoden
+
+```{r}
+ 
+
+# set.seed(54201)
+# 
+# 
+# base_glm <- glmmTMB(answerlength_incl_zero ~ 1 + as.factor(question_id) +
+#                      (1 | teacher_id) + (1 | respondent_hash),
+#                   data = data_poisson,
+#                   ziformula =~ 1 + as.factor(question_id) +
+#                    (1 | teacher_id) + (1 | respondent_hash),
+#                  family = poisson)
+# # Warning: Model convergence problem; extreme or very small eigenvalues detected. See vignette('troubleshooting')
+# 
+# saveRDS(base_glm,"base_glm.rds")
+# 
+# base_glm <-readRDS("base_glm.rds")
+# 
+# summary(base_glm)
+# sjPlot::tab_model(base_glm)
+
+
+
+
+
+
+# uVs_glm <- glmmTMB(answerlength_incl_zero ~ 1 + as.factor(question_id) + 
+#                      motiv_cue + as.factor(position) + 
+#                      (1|teacher_id / respondent_hash),
+#                   data = data_poisson,
+#                   ziformula =~ 1 + as.factor(question_id) + 
+#                      motiv_cue + as.factor(position)  + 
+#                      (1|teacher_id / respondent_hash),
+#                  family = poisson)
+# # Warning: NA/NaN function evaluation 
+# # Warning: Model convergence problem; extreme or very small eigenvalues detected. See vignette('troubleshooting')
+# 
+# saveRDS(uVs_glm,"uVs_glm.rds")
+# 
+# uVs_glm <-readRDS("uVs_glm.rds")
+# 
+# summary(uVs_glm)
+# sjPlot::tab_model(uVs_glm)
+
+
+
+
+# int_glm <- glmmTMB(answerlength_incl_zero ~ 1 + as.factor(question_id) + 
+#                      motiv_cue * as.factor(position) + 
+#                      (1|teacher_id / respondent_hash),
+#                   data = data_poisson,
+#                   ziformula = ~  1 + as.factor(question_id) + 
+#                      motiv_cue * as.factor(position)  + 
+#                      (1|teacher_id / respondent_hash),
+#                  family = poisson)
+# 
+# saveRDS(int_glm,"int_glm.rds")
+
+# int_glm <-readRDS("int_glm.rds")
+# 
+# summary(int_glm)
+# sjPlot::tab_model(int_glm)
+#modelsummary(int_glm)
+
+
+```
+
+## BRMS-package
+
+```{r}
+
+set.seed(74791)
+
+
+base_brms <- brm(bf(answerlength_incl_zero  ~ 1 + as.factor(question_id) +
+                                (1 | teacher_id) + (1 | respondent_hash),
+                               zi ~ 1 + as.factor(question_id) +
+                                 (1 | teacher_id) + (1 | respondent_hash)),
+                            family = zero_inflated_poisson(),
+                            data = data_poisson)
+saveRDS(base_brms,"base_brms.rds")
+
+base_brms <-readRDS("base_brms.rds")
+
+summary(base_brms)
+sjPlot::tab_model(base_brms)
+
+
+
+
+uVs_brms <- brm(bf(answerlength_incl_zero  ~ 1 + as.factor(question_id) +
+                                 motiv_cue+as.factor(position) +
+                                 (1 | teacher_id) + (1 | respondent_hash),
+                               zi ~ 1 + as.factor(question_id) +
+                                 motiv_cue+as.factor(position)+
+                                 (1 | teacher_id) + (1 | respondent_hash)),
+                            family = zero_inflated_poisson(),
+                            data = data_poisson)
+saveRDS(uVs_brms,"uVs_brms.rds")
+
+uVs_brms <-readRDS("uVs_brms.rds")
+
+summary(uVs_brms)
+sjPlot::tab_model(uVs_brms)
+
+
+set.seed(37440)
+
+int_brms <- brm(bf(answerlength_incl_zero  ~ 1 + as.factor(question_id) +
+                                 motiv_cue*as.factor(position) +
+                                 (1 | teacher_id) + (1 | respondent_hash),
+                               zi ~ 1 + as.factor(question_id) +
+                                motiv_cue*as.factor(position)+
+                                 (1 | teacher_id) + (1 | respondent_hash)),
+                            family = zero_inflated_poisson(),
+                            data = data_poisson,
+                iter = 4000)
+saveRDS(int_brms,"int_brms.rds")
+
+int_brms <-readRDS("int_brms.rds")
+
+summary(int_brms)
+sjPlot::tab_model(int_brms)
+
+
+# Darstellung der Ergebnisse
+
+#sjPlot::tab_model(int_glm, int_brms)
+#modelsummary(int_glm)
+
+
+```
+
+## Todo:
+- Random effects ()()
+- Posterior predictive check pp_check()
+- Modellvergleich
+
+
+## Modellvergleiche
+
+```{r}
+sjPlot::tab_model(mod0, mod1)
+```
+
+
+## Restliche Themen
+
 
 
 ```{r}
@@ -383,7 +603,7 @@ What causes overdispersion? Overdispersion is caused by positive correlation bet
 
 library(lme4)
 library(merTools)
-library(glmmTMB) # fitting generalised linear mixed models
+library(glmmTMB) # fitting generalised linear mixed models # kann auch random effects im ZI-Teil
 library(bbmle)
 
 
@@ -400,56 +620,46 @@ library(bbmle)
 #                       family=poisson)
 # summary(zipoisson1)
 
-mod_0 <- glmmTMB(answerlength_incl_zero ~ 1 +  (1|respondent_hash),
+# mod_0 <- glmmTMB(answerlength_incl_zero ~ 1 +  (1|respondent_hash),
+#             data = data_poisson,
+#             ziformula =~ 1,
+#             family = poisson)
+# 
+# summary(mod_0)
+# 
+# mod_position <- glmmTMB(answerlength_incl_zero ~ 1 + position + (1|respondent_hash),
+#             data = data_poisson,
+#             ziformula =~ 1,
+#             family = poisson)
+# 
+# summary(mod_position)
+# 
+# mod_instruction <- glmmTMB(answerlength_incl_zero ~ 1 + instruction + (1|respondent_hash),
+#             data = data_poisson,
+#             ziformula =~ 1,
+#             family = poisson)
+# 
+# summary(mod_instruction)
+# 
+# mod_instruction_position <- glmmTMB(answerlength_incl_zero ~ 1 + instruction + position + (1|respondent_hash),
+#             data = data_poisson,
+#             ziformula =~ 1,
+#             family = poisson)
+# 
+# summary(mod_instruction_position)
+
+
+### Erweitertes Modell (ToDo: Angepasst an BRMS-modell)
+
+mod_vgl_brms <- glmmTMB(answerlength_incl_zero ~ 1 + as.factor(question_id) + motiv_cue * as.factor(position) + (1|respondent_hash + teacher_id),
             data = data_poisson,
-            ziformula =~ 1,
+            ziformula =~ 1 + as.factor(question_id) + motiv_cue * as.factor(position)  + (1|respondent_hash + teacher_id),
             family = poisson)
 
-summary(mod_0)
-
-mod_position <- glmmTMB(answerlength_incl_zero ~ 1 + position + (1|respondent_hash),
-            data = data_poisson,
-            ziformula =~ 1,
-            family = poisson)
-
-summary(mod_position)
-
-mod_instruction <- glmmTMB(answerlength_incl_zero ~ 1 + instruction + (1|respondent_hash),
-            data = data_poisson,
-            ziformula =~ 1,
-            family = poisson)
-
-summary(mod_instruction)
-
-mod_instruction_position <- glmmTMB(answerlength_incl_zero ~ 1 + instruction + position + (1|respondent_hash),
-            data = data_poisson,
-            ziformula =~ 1,
-            family = poisson)
-
-summary(mod_instruction_position)
-```
+summary(mod_vgl_brms)
 
 
-https://fukamilab.github.io/BIO202/04-C-zero-data.html#zero-inflated_poisson_glm 
-```{r}
-library(pscl)
-M3 <- zeroinfl(answerlength_incl_zero ~ instruction + position | ## Predictor for the Poisson process
-                 1, ## Predictor for the Bernoulli process;
-               dist = 'poisson',
-               data = data_poisson %>% filter(question_id == 47))
-
-
-summary(M3)
-
-M3 <- zeroinfl(answerlength_incl_zero ~ instruction + position | ## Predictor for the Poisson process
-                 instruction + position, ## Predictor for the Bernoulli process;
-               dist = 'poisson',
-               data = data_poisson %>% filter(question_id == 47))
-
-
-summary(M3)
 
 ```
-
 
 

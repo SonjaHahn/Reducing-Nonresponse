@@ -207,17 +207,17 @@ mod_predictors_and_interaction <- brm(bf(answerlength_incl_zero  ~ 1 + as.factor
 # 
 # Group-Level Effects: 
 #   ~respondent_hash (Number of levels: 3141) 
-# Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+#                     Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
 # sd(Intercept)        0.73      0.01     0.71     0.75 1.01      410      620
 # sd(zi_Intercept)     2.94      0.19     2.59     3.34 1.01      538     1012
 # 
 # ~teacher_id (Number of levels: 105) 
-# Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+#                       Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
 # sd(Intercept)        0.22      0.02     0.17     0.27 1.01      175      458
 # sd(zi_Intercept)     0.77      0.12     0.54     1.02 1.00      670     1505
 # 
 # Population-Level Effects: 
-#   Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+#                                                                Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
 # Intercept                                                       4.21      0.03     4.14     4.27 1.01      262      472
 # zi_Intercept                                                   -5.35      0.31    -5.99    -4.76 1.01      689     1434
 # as.factorquestion_id48                                         -0.35      0.00    -0.35    -0.34 1.00     6457     3166
