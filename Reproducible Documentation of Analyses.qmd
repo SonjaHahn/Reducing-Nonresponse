@@ -468,6 +468,64 @@ sjPlot::tab_model(int_brms)
 - Posterior predictive check pp_check()
 - Modellvergleich
 
+## pp_check
+
+```{r}
+pp_check(int_brms)+
+    xlim(0, 100)
+
+pp_check(uVs_brms)
+
+pp_check(base_brms)+
+    xlim(0, 100)
+```
+## pp_check mit einfacheren Modellen
+
+```{r}
+set.seed(74791)
+
+null_brms <- brm(bf(answerlength_incl_zero  ~ 1 ,
+                               zi ~ 1 ),
+                            family = zero_inflated_poisson(),
+                            data = data_poisson)
+saveRDS(null_brms,"null_brms.rds")
+
+null_brms <-readRDS("null_brms.rds")
+
+summary(null_brms)
+pp_check(null_brms) + xlim(0,100)
+
+set.seed(74791)
+
+mini_brms <- brm(bf(answerlength_incl_zero  ~ 1 + as.factor(question_id),
+                               zi ~ 1 + as.factor(question_id)),
+                            family = zero_inflated_poisson(),
+                            data = data_poisson)
+saveRDS(mini_brms,"mini_brms.rds")
+
+mini_brms <-readRDS("mini_brms.rds")
+
+summary(mini_brms)
+pp_check(mini_brms) + xlim(0,100)
+
+
+set.seed(74791)
+
+
+base_brms <- brm(bf(answerlength_incl_zero  ~ 1 + as.factor(question_id) +
+                                (1 | teacher_id) + (1 | respondent_hash),
+                               zi ~ 1 + as.factor(question_id) +
+                                 (1 | teacher_id) + (1 | respondent_hash)),
+                            family = zero_inflated_poisson(),
+                            data = data_poisson)
+saveRDS(base_brms,"base_brms.rds")
+
+base_brms <-readRDS("base_brms.rds")
+
+summary(base_brms)
+```
+
+
 
 ## Modellvergleiche
 
