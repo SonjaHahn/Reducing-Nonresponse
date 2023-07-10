@@ -1,0 +1,846 @@
+---
+title: "Reproducible Documentation of Analyses"
+author: "Sonja Hahn, Samuel Merk"
+format: html
+execute:
+  cache: true
+editor_options: 
+  chunk_output_type: console
+---
+
+## Libraries
+```{r loading libraries}
+#| message: false
+#| cache: false
+
+library(tidyverse)
+library(reactable)
+library(naniar)
+library(brms)
+library(glmmTMB)
+library(modelsummary)
+```
+
+
+## Data Download
+
+The raw data of the study blalablalba you can download it `r xfun::embed_file("data/eva_data_OEQexperimentI.csv", "eva_data_OEQexperimentI.csv", "here")` ...
+
+Itemcodes:
+
+```{r}
+#| cache: false
+
+read_csv("data/question_keys_data.csv") %>% 
+  reactable()
+
+keys <- read.csv("data/question_keys_data.csv")
+```
+
+
+## Data Import
+### Experiment 1
+#### OEI data
+
+```{r import the data}
+#| cache: true
+
+# raw data experiment 1 ########################################################
+## import data from suf
+data_s1 <- read_csv("data/eva_data_OEQexperimentI.csv")%>%
+  mutate(answer_text_isna = is.na(answer_text),
+         #die folgende Zeile macht effektiv das gleiche --> 
+         ## ToDo: anpassen "sinnvolle Antwortl??nge?" 
+         answert_text_isna_or_length0 = ifelse(answer_text_isna == T, T,
+                                         nchar(answer_text) == 0),
+         no_oeq_answer = ifelse(question_id %in% c(47:48),
+                                answer_text_isna, NA),
+         question_id_fac = as.factor(question_id),
+         position = ifelse(survey_id %in% c(2,3), 
+                           "at the beginning", "at the end"),
+         instruction = ifelse(survey_id %in% c(2,5),
+                              "motivating instruction", "neutral instruction"),
+         oeq_answerlengthifgiven = ifelse(no_oeq_answer == T, 
+                                          NA, 
+                                          nchar(answer_text)),
+         oeq_answerlengthifgiven_log = log(oeq_answerlengthifgiven))%>%
+  group_by(class_id, question_id)%>%
+  mutate(oeq_answer_classprop = 1 - mean(no_oeq_answer, na.rm = T),
+         oeq_answerlengthifgiven_perclass = 
+           sum(nchar(answer_text), 
+               na.rm = T)/(n()-sum(no_oeq_answer)))%>%
+  ungroup()
+```
+
+# Datenexploration
+
+```{r}
+#| eval : false
+View(data_s1)
+
+names(data_s1)
+
+#data_s1 %>% select(question_id, survey_id) %>% table()
+
+
+```
+
+
+
+#### SEEQ data
+
+
+```{r data-wrangling-s1-cfa-data}
+#| cache: true
+
+# pivoting to wide data frame with seeq data for CFA ##################################
+# Due to technical issues there are some nonunique entries per student and variables
+# These were remove with the following function
+paste_na_function <- function(x) ifelse(length(unique(na.omit(x))) > 1, NA, mean(x))
+
+data_s1_seeq <- data_s1%>%
+  select(respondent_hash, answer_integer, class_id, teacher_id, question_id)%>%
+  filter(question_id %in% c(1:20))%>%
+  unique(.)%>%
+  pivot_wider(
+    names_from = question_id,
+    values_from = answer_integer,
+    values_fn = list(answer_integer = paste_na_function)
+  )%>%
+  mutate(v1 = `1`, v2 = `2`, v3 = `3`, v4 = `4`, v5 = `5`, v6 = `6`, v7 = `7`, 
+         v8 = `8`, v9 = `9`, v10 = `10`, v11 = `11`, v12 = `12`, v13 = `13`, 
+         v14 = `14`, v15 = `15`, v16 = `16`, v17 = `17`, v18 = `18`, v19 = `19`,
+         v20 = `20`,
+         Learning = rowMeans(data.frame(v1, v2, v3, v4), na.rm = T),
+         Ethusiasm = rowMeans(data.frame(v5, v6, v7, v8), na.rm = T),
+         Organisation = rowMeans(data.frame(v9, v10, v11, v12), na.rm = T),
+         `Group Interaction` = rowMeans(data.frame(v14, v15, v16, v17), na.rm = T),
+         `Individual Rapport` = rowMeans(data.frame(v18, v19, v20), na.rm = T))
+```
+ANMERKUNG (Sonja): Da sind weitere Items (??hnlich zum SEEQ) 
+und auch Angaben zu Schule etc. - wurden die sp??ter gestellt?
+
+## Recoding
+
+Was z??hlt als **sinnvolle** Antwort?
+```{r}
+#| cache: true
+
+
+data_s1 %>% filter(question_id %in% c(47:48)) %>% 
+  select(answer_text) %>% 
+  unique() %>% 
+  mutate(l.answer = nchar(answer_text)) %>% 
+  filter(l.answer <= 1) %>% 
+  arrange(l.answer)  %>%  View()
+
+
+# Welche sollen herausgenommen werden?
+
+# Zeichen
+# L??sche alle - / * . ? * ??? - ??? # Vorgehen beim InDiKo-Bericht
+
+del_character <- "[-/*.?*??????]"
+
+data_s1 %>% 
+  mutate(answer_text_short = str_replace_all(answer_text, del_character, "")) %>% 
+  select(starts_with("answer_text")) %>% View()
+
+# Lange --> mit welcher Begr??ndung ("nichts" vs. "Buch") 
+
+# Inhaltlich ("nichts"?) (das h??ngt etwas von unseren Hypothesen ab)
+
+# evtl. aufbereitete Antworten abspeichern
+
+
+```
+Oft steht sinngem???? "alles gut"
+
+evtl. positive und negative Antworten zusammenf??gen (Idee: Wenn alles gut war, 
+sollte zumindest bei den positiven Aspekten was stehen); 
+das vereinfacht evtl. auch die folgenden Analysen (Messwdh. als weiteres Level
+in den Daten eliminiert)
+
+```{r}
+data_s1 %>% 
+  select(completed_survey_id) %>% 
+  unique() %>% dim()
+
+data_s1 %>% 
+  select(class_id) %>% 
+  unique() %>% dim()
+
+data_s1 %>% 
+  select(teacher_id) %>% 
+  unique() %>% dim()
+
+data_s1 %>% 
+  select(course_city) %>% 
+  unique() %>% dim()
+
+data_s1 %>% 
+  group_by(position,instruction) %>% 
+  summarize(n = n_distinct(completed_survey_id))
+
+```
+
+
+
+Wer bricht SEEQ ab?
+```{r}
+data_s1_seeq_ext <- data_s1%>%
+  select(respondent_hash, answer_integer, class_id, teacher_id, question_id)%>%
+  filter(question_id %in% c(1:28))%>%
+  unique(.)%>%
+  pivot_wider(
+    names_from = question_id,
+    values_from = answer_integer,
+    values_fn = list(answer_integer = paste_na_function) )%>%
+  mutate(v1 = `1`, v2 = `2`, v3 = `3`, v4 = `4`, v5 = `5`, v6 = `6`, v7 = `7`, 
+         v8 = `8`, v9 = `9`, v10 = `10`, v11 = `11`, v12 = `12`, v13 = `13`, 
+         v14 = `14`, v15 = `15`, v16 = `16`, v17 = `17`, v18 = `18`, v19 = `19`,
+         v20 = `20`, v21 = `21`, v22 = `22`, v23 = `23`, 
+         v24 = `24`, v25 = `25`, v26 = `26`, v27 = `27`, v28 = `28`)
+  
+
+# alle personen mit mindestens einem seeq item
+data_s1 %>% 
+  select(completed_survey_id, question_id, answer_integer) %>% 
+  filter(question_id %in% c(1:20)) %>% 
+  na.omit() %>% 
+  select(completed_survey_id) %>% 
+  distinct()
+
+# alle personen
+data_s1 %>% 
+  select(completed_survey_id) %>% 
+  distinct()
+
+# Missing auf einzelnen Variablen
+data_s1_seeq_ext %>% 
+  select(v1:v28) %>% 
+  gg_miss_var()
+
+mean(is.na(data_s1_seeq_ext$v21))
+# Wollen wir da was machen, oder lediglich berichten (55/3163 sind recht wenig,
+# zumal zwar eine Tendenz vorhanden ist, gegen Ende mehr auszulassen, aber
+# das nicht komplett systematisch ist, Personen einfach weiterbl??ttern k??nnen etc.)
+```
+
+
+
+
+
+
+## Deskriptive Analyse
+
+Over all questions and experimental conditions, 
+`r length(data_s1%>%filter(question_id %in% c(47,48) & no_oeq_answer == F)%>%.$answer_text)/data_s1%>%filter(question_id %in% c(47,48))%>%nrow()*100`% 
+of students gave answers, which were at average `r data_s1 %>% filter(question_id %in% c(47, 48)) %>% summarise(mean(oeq_answerlengthifgiven, na.rm = TRUE))` characters long `r table(nchar(data_s1%>%filter(no_oeq_answer == F)%>%.$answer_text))`.
+Open ended items on positive effects of teaching were answered more frequently
+than open ended items on negative effects (`r length(data_s1%>%filter(question_id %in% c(47) & no_oeq_answer == F)%>%.$answer_text)/data_s1%>%filter(question_id %in% c(47))%>%nrow()*100` % vs. `r length(data_s1%>%filter(question_id %in% c(48) & no_oeq_answer == F)%>%.$answer_text)/data_s1%>%filter(question_id %in% c(48))%>%nrow()*100`%) and received longer responses (`r data_s1 %>% filter(question_id %in% c(47)) %>% summarise(mean(oeq_answerlengthifgiven, na.rm = TRUE))` vs `r data_s1 %>% filter(question_id %in% c(48)) %>% summarise(mean(oeq_answerlengthifgiven, na.rm = TRUE))`)
+
+### Table on Answer Characteristics
+
+```{r}
+library(modelsummary)
+
+prop_valid <- function(x) mean(!is.na(x))
+
+datasummary(oeq_answerlengthifgiven * factor(question_id) ~ prop_valid + Mean +  P25 + P50 + P75 + Max, 
+            data = data_s1 %>% filter(question_id %in% c(47,48)),
+            output = 'latex')
+
+```
+
+
+### Global Picture
+```{r}
+# no_oeq_answer: dichotomous
+library(hrbrthemes)
+update_geom_font_defaults()
+
+participants <- data_s1 %>% 
+  group_by(position,instruction) %>% 
+  summarize(n = n_distinct(completed_survey_id)) 
+
+# number of participants
+  # not number of answers
+
+ggplot(
+  data_s1 %>%
+    filter(question_id %in% c(47,48)),
+  aes(position, (1-as.numeric(no_oeq_answer))*100, color = instruction)) +
+  stat_summary(fun = "mean", 
+               position = position_dodge(width = 0.25),
+               geom="point") + 
+  annotate("text",
+           x = c(0.8,1.2,1.8,2.2),
+           y = 6,
+           label = paste("n =", participants$n))+ 
+  coord_cartesian(ylim = c(0, 100)) +
+  labs(y = "response rates in %")+
+  guides(col=guide_legend(title=NULL))+
+  scale_color_ipsum() +
+  theme_ipsum() 
+
+ggsave("plots/prop_OEAs.eps") # ToDo: Dateiformat!
+
+
+# # no_oeq_answer: classwise aggregations
+# ggplot(
+#   data_s1 %>%
+#     filter(question_id %in% c(47, 48)),
+#   aes(position, as.numeric(oeq_answer_classprop), color = instruction)
+# ) +
+#   stat_summary(position = position_dodge(width = 0.25))
+
+participants <- data_s1 %>% 
+  filter(no_oeq_answer == FALSE) %>% 
+  group_by(position,instruction) %>% 
+  summarize(n = n_distinct(completed_survey_id)) 
+
+# number of participants providing at least one answer
+
+# answertextlength: level-1
+ggplot(
+  data_s1 %>%
+    filter(question_id %in% c(47, 48)),
+  aes(position, oeq_answerlengthifgiven, color = instruction)
+) + 
+  geom_violin(fill = NA) +
+  labs(y = "length of answers (characters)")+
+    annotate("text",
+           x = c(0.8,1.2,1.8,2.2),
+           y = -40,
+           label = paste("n =", participants$n))+ 
+  stat_summary(position = position_dodge(width = .9)) +
+  guides(col=guide_legend(title=NULL))+
+  scale_color_ipsum() +
+  theme_ipsum()
+
+ggsave("plots/length_OEAs.eps")
+
+```
+
+aktueller Plan: Grafiken beschrieben und daraus ableiten, weshalb die 
+Mehrebenstruktur einfache approaches wie chi^2 oder MWU problematisch macht.
+
+## Zero-Inflated Poisson-Regression
+
+```{r}
+# generate data
+data_poisson <- 
+  data_s1 %>% 
+  filter(question_id %in% c(47, 48)) %>% 
+  mutate(answerlength_incl_zero = ifelse(answer_text_isna == T, 0,
+                                     #    ifelse(oeq_answerlengthifgiven == 1, 0, #??
+                                                oeq_answerlengthifgiven))
+# Das ergibt pro Item die Antwortl??nge, d.h. noch geschachtelt in der Person
+
+data_poisson <- data_poisson %>% 
+  mutate(motiv_cue = factor(instruction, levels = c("neutral instruction","motivating instruction"))) 
+
+# look at the distribution
+ggplot(data_poisson, aes(answerlength_incl_zero)) +
+  geom_histogram(binwidth = 1)
+
+ggplot(data_poisson, aes(answerlength_incl_zero)) +
+  geom_density()
+
+ggplot(data_poisson, aes(answerlength_incl_zero)) +
+  geom_histogram(binwidth = 1) +
+  coord_cartesian(xlim = c(0,50), ylim = c(0, 200))
+
+ggplot(data_poisson, aes(answerlength_incl_zero)) +
+  geom_histogram(binwidth = 1) +
+  coord_cartesian(xlim = c(0,50), ylim = c(0, 400))+
+  facet_wrap(vars(question_id)) 
+
+```
+
+## sjplot ausprobieren
+```{r}
+# # https://strengejacke.github.io/sjPlot/articles/tab_bayes.html
+# # load required packages
+library(sjPlot)
+library(insight)
+library(httr)
+library(brms)
+# 
+# # m1 <- insight::download_model("brms_zi_2")
+# # 
+# # zinb <- read.csv("http://stats.idre.ucla.edu/stat/data/fish.csv")
+# # set.seed(123)
+# # m1 <- brm(bf(
+# #     count ~ persons + child + camper + (1 | persons),
+# #     zi ~ child + camper + (1 | persons)
+# #   ),
+# #   data = zinb,
+# #   family = zero_inflated_poisson()
+# # )
+# m1 <- insight::download_model("brms_zi_2")
+# 
+# m2 <- insight::download_model("brms_mv_3")
+# 
+# summary(m1)
+# 
+# tab_model(m1)
+# # Die unterscheiden sich, weil standardm????ig der Medien der posterior-distribution berichtet wird?
+# 
+# # zinb <- read.csv("http://stats.idre.ucla.edu/stat/data/fish.csv")
+# # set.seed(123)
+# # m1 <- brm(bf(
+# #     count ~ persons + child + camper + (1 | persons),
+# #     zi ~ child + camper + (1 | persons)
+# #   ),
+# #   data = zinb,
+# #   family = zero_inflated_poisson()
+# # )
+# 
+# # https://stats.stackexchange.com/questions/13166/rs-lmer-cheat-sheet
+# # https://bbolker.github.io/mixedmodels-misc/glmmFAQ.html#model-definition
+# # https://stats.stackexchange.com/questions/228800/crossed-vs-nested-random-effects-how-do-they-differ-and-how-are-they-specified
+# 
+# 
+# m1 <- brm(bf(
+#     answerlength_incl_zero ~  motiv_cue + (1 | teacher_id / respondent_hash),
+#     zi ~  motiv_cue + (1 | teacher_id / respondent_hash)
+#   ),
+#   data = data_poisson,
+#   family = zero_inflated_poisson()
+# )
+# 
+# summary(m1)
+# tab_model(m1)
+# 
+# # base_brms <- brm(bf(answerlength_incl_zero  ~ 1 + as.factor(question_id) +
+# #                                  (1|respondent_hash + teacher_id),
+# #                                zi ~ 1 + as.factor(question_id) +
+# #                                  (1|respondent_hash + teacher_id)),
+# #                             family = zero_inflated_poisson(), 
+# #                             data = data_poisson)
+# # saveRDS(base_brms,"base_brms.rds")
+
+```
+
+
+### Modelling the distribution of the response variable
+```{r}
+library(brms)
+mod_zipoiss <-
+  brm(
+    bf(
+      answerlength_incl_zero  ~ 1,
+      zi ~ 1
+    ),
+    family = zero_inflated_poisson(),
+    data = data_poisson,
+    iter = 4000,
+    cores = 20
+  )
+
+pp_check(mod_zipoiss, type = 'ecdf_overlay')
+mod_zipoiss_loo <- loo(mod_zipoiss)
+
+
+mod_hulognormal <-
+  brm(
+    bf(
+      answerlength_incl_zero  ~ 1,
+      hu ~ 1
+    ),
+    family = hurdle_lognormal(),
+    data = data_poisson,
+    cores = 20,
+    iter = 4000
+  )
+
+pp_check(mod_hulognormal, type = 'ecdf_overlay')
+mod_hulognormal_loo <-
+  loo(mod_hulognormal)
+
+
+mod_hunegbinomial <-
+  brm(
+   bf(
+      answerlength_incl_zero  ~ 1,
+      hu ~ 1
+    ),
+    family = hurdle_negbinomial(),
+    data = data_poisson,
+    iter = 4000,
+    cores = 20
+  )
+
+pp_check(mod_hunegbinomial, type = 'ecdf_overlay')
+mod_hunegbinomial_loo <-
+  loo(mod_hunegbinomial)
+
+loo_compare(
+  mod_zipoiss_loo,
+  mod_hulognormal_loo,
+  mod_hunegbinomial_loo
+)
+```
+
+Posterior predictive checks imply that the response variable can be fitted well, assuming a negative binomial distribution. Loo implies the best fit of this distribution in comarison to lognormal or poisson distributions.
+
+### Modelling the distribution of the response variable with random effects
+```{r}
+library(brms)
+mod_interceptonly_zipoiss <-
+  brm(
+    bf(
+      answerlength_incl_zero  ~ 1 + (1 | teacher_id + respondent_hash),
+      zi ~ 1 + (1 | teacher_id + respondent_hash)
+    ),
+    family = zero_inflated_poisson(),
+    data = data_poisson,
+    iter = 4000,
+    cores = 20
+  )
+
+pp_check(mod_interceptonly_zipoiss, type = 'ecdf_overlay')
+mod_interceptonly_zipoiss_loo <- loo(mod_interceptonly_zipoiss)
+
+
+mod_interceptonly_hulognormal <-
+  brm(
+    bf(
+      answerlength_incl_zero  ~ 1 + (1 | teacher_id + respondent_hash),
+      hu ~ 1 + (1 | teacher_id + respondent_hash)
+    ),
+    family = hurdle_lognormal(),
+    data = data_poisson,
+    cores = 20,
+    iter = 4000
+  )
+
+pp_check(mod_interceptonly_hulognormal, type = 'ecdf_overlay')
+mod_interceptonly_hulognormal_loo <-
+  loo(mod_interceptonly_hulognormal)
+
+
+mod_interceptonly_hunegbinomial <-
+  brm(
+   bf(
+      answerlength_incl_zero  ~ 1 + (1 | teacher_id + respondent_hash),
+      hu ~ 1 + (1 | teacher_id + respondent_hash)
+    ),
+    family = hurdle_negbinomial(),
+    data = data_poisson,
+    cores = 20
+  )
+
+pp_check(mod_interceptonly_hunegbinomial, type = 'ecdf_overlay')
+mod_interceptonly_hunegbinomial_loo <-
+  loo(mod_interceptonly_hunegbinomial)
+
+loo_compare(
+  mod_interceptonly_zipoiss_loo,
+  mod_interceptonly_hulognormal_loo,
+  mod_interceptonly_hunegbinomial_loo
+)
+```
+
+
+
+### BRMS-package
+
+```{r}
+
+set.seed(74791)
+
+
+base_brms <- brm(bf(answerlength_incl_zero  ~ 1 + as.factor(question_id) +
+                                (1 | teacher_id) + (1 | respondent_hash),
+                               zi ~ 1 + as.factor(question_id) +
+                                 (1 | teacher_id) + (1 | respondent_hash)),
+                            family = zero_inflated_poisson(),
+                            data = data_poisson,
+                iter = 4000)
+saveRDS(base_brms,"base_brms1.rds")
+
+base_brms <-readRDS("base_brms.rds")
+base_brms1 <-readRDS("base_brms1.rds")
+
+summary(base_brms)
+sjPlot::tab_model(base_brms)
+
+
+
+
+uVs_brms <- brm(bf(answerlength_incl_zero  ~ 1 + as.factor(question_id) +
+                                 motiv_cue+as.factor(position) +
+                                 (1 | teacher_id) + (1 | respondent_hash),
+                               zi ~ 1 + as.factor(question_id) +
+                                 motiv_cue+as.factor(position)+
+                                 (1 | teacher_id) + (1 | respondent_hash)),
+                            family = zero_inflated_poisson(),
+                            data = data_poisson,
+                iter = 4000)
+saveRDS(uVs_brms,"uVs_brms1.rds")
+
+uVs_brms <-readRDS("uVs_brms.rds")
+uVs_brms1 <-readRDS("uVs_brms1.rds")
+
+summary(uVs_brms)
+sjPlot::tab_model(uVs_brms)
+
+
+set.seed(37440)
+
+int_brms <- brm(bf(answerlength_incl_zero  ~ 1 + as.factor(question_id) +
+                                 motiv_cue*as.factor(position) +
+                                 (1 | teacher_id) + (1 | respondent_hash),
+                               zi ~ 1 + as.factor(question_id) +
+                                motiv_cue*as.factor(position)+
+                                 (1 | teacher_id) + (1 | respondent_hash)),
+                            family = zero_inflated_poisson(),
+                            data = data_poisson,
+                iter = 4000)
+saveRDS(int_brms,"int_brms1.rds")
+
+int_brms <-readRDS("int_brms.rds")
+int_brms1 <-readRDS("int_brms1.rds")
+
+summary(int_brms)
+sjPlot::tab_model(int_brms)
+
+
+# Darstellung der Ergebnisse
+
+#sjPlot::tab_model(int_glm, int_brms)
+#modelsummary(int_glm)
+
+
+```
+
+## Todo:
+- Random effects ()()
+- Posterior predictive check pp_check()
+- Modellvergleich
+
+## pp_check
+
+```{r}
+pp_check(int_brms)+
+    xlim(0, 100)
+
+pp_check(uVs_brms)
+
+pp_check(uVs_brms1)+
+    xlim(0, 100)
+```
+
+
+
+
+## Modellvergleiche
+
+```{r}
+
+base_brms <-readRDS("base_brms.rds")
+uVs_brms <-readRDS("uVs_brms.rds")
+int_brms <-readRDS("int_brms.rds")
+
+# loos <- loo_compare(base_brms,uVs_brms)
+# loos
+summary(base_brms)
+
+models <- list(NullModel = base_brms, LinModel = uVs_brms, IntModel = int_brms)
+
+modelsummary::modelsummary(models)
+
+sjPlot::tab_model(base_brms,uVs_brms)
+```
+
+
+## Restliche Themen
+
+
+
+```{r}
+#| eval : false
+
+###############
+# null modell mit person als clustervariable
+# mod0 <- brm(answerlength_incl_zero ~ 1 + (1|respondent_hash),
+#             family = zero_inflated_poisson(), # zero_inflated_poisson(link = "log", link_zi = "logit")
+#             data = data_poisson)
+# 
+# # null modell mit Kursleiter als clustervariable
+# mod00 <- brm(answerlength_incl_zero ~ 1 + (1|teacher_id),
+#              family = zero_inflated_poisson(), # zero_inflated_poisson(link = "log", link_zi = "logit")
+#              data = data_poisson)
+# 
+# # null modell mit Kursleiter und person als clustervariable + questID
+# mod000 <- brm(answerlength_incl_zero ~ 1 + as.factor(question_id) + (1|respondent_hash + teacher_id),
+#               family = zero_inflated_poisson(), # zero_inflated_poisson(link = "log", link_zi = "logit")
+#               data = data_poisson)
+
+# # null modell mit person als clustervariable + questID
+# mod000r <- brm(answerlength_incl_zero ~ 1 + as.factor(question_id) + (1|respondent_hash),
+#               family = zero_inflated_poisson(), 
+#               data = data_poisson)
+# ###################
+## weitere n??chste Schritte:
+##   * Auf Server klonen
+##   * Backgroundjobs -> https://github.com/sol-eng/background-jobs/tree/main/simulation-job
+##   * Rhat interpretieren lernen und dann tunen mit Iterationenanzahl 
+## -> (soll um 1 sein, entspricht ANOVA-F: Varianz within vs. between chains)
+## -> https://mc-stan.org/misc/warnings.html#r-hat: https://mc-stan.org/misc/warnings.html#r-hat:
+##    We recommend running at least four chains by default and in general only fully trust the sample if R-hat is less than 1.01. In early workflow, R-hat below 1.1 is often sufficient.
+## -> ESS soll m??glichst gro?? sein
+##   * Diverse Nullmodelle sch??tzen (siehe direkt dar??ber) und dann entscheiden
+##     welche Mehrebenestruktur modelliert wird
+## -> mod000 scheint ok zu sein (keine Fehlermeldungen, R-hat < 1.1)
+
+# > BackgroundJobs_results$mod000
+#  Family: zero_inflated_poisson 
+#   Links: mu = log; zi = identity 
+# Formula: answerlength_incl_zero ~ 1 + as.factor(question_id) + (1 | respondent_hash + teacher_id) 
+#    Data: data_poisson (Number of observations: 6282) 
+#   Draws: 4 chains, each with iter = 2000; warmup = 1000; thin = 1;
+#          total post-warmup draws = 4000
+# 
+# Group-Level Effects: 
+# ~respondent_hash (Number of levels: 3141) 
+#               Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+# sd(Intercept)     0.73      0.01     0.71     0.75 1.02      204      387
+# 
+# ~teacher_id (Number of levels: 105) 
+#               Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+# sd(Intercept)     0.22      0.02     0.18     0.27 1.02      156      473
+# 
+# Population-Level Effects: 
+#                        Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+# Intercept                  4.25      0.03     4.20     4.30 1.01      274      641
+# as.factorquestion_id48    -0.35      0.00    -0.35    -0.34 1.00     6037     3281
+# 
+# Family Specific Parameters: 
+#    Estimate Est.Error l-95% CI u-95% CI Rhat Bulk_ESS Tail_ESS
+# zi     0.23      0.01     0.22     0.24 1.00     2887     2706
+# 
+# Draws were sampled using sampling(NUTS). For each parameter, Bulk_ESS
+# and Tail_ESS are effective sample size measures, and Rhat is the potential
+# scale reduction factor on split chains (at convergence, Rhat = 1).
+
+```
+
+Komplexere Modelle
+
+```{r}
+# Next Steps
+#  * Pr??diktorvariablen einpflegen (2 uVs, bei L??nge und bei zi)
+#  * Interpretieren, evtl. sowas wie Modellvergleiche?
+#  * "Kreuzvalidierung" mit frequentistischer Methode
+
+# fit_zinb2<-brm(bf(count~persons+child+camper,zi~child), data=zinb,family=zero_inflated_poisson())
+
+
+
+
+# Item als Pr??diktor mit Kursleiter und person als clustervariable
+mod01a <- brm(answerlength_incl_zero ~ 1 +  (1|respondent_hash + teacher_id),
+              family = zero_inflated_poisson(), # zero_inflated_poisson(link = "log", link_zi = "logit")
+              data = data_poisson)
+
+mod1 <- brm(answerlength_incl_zero ~ 1 + position + (1|respondent_hash),
+            family = zero_inflated_poisson(),
+            data = data_poisson,
+            cores = 8,
+            iter = 4000)
+
+summary(mod1)
+
+sjPlot::tab_model(mod0, mod1)
+
+# https://bookdown.org/ajkurz/Statistical_Rethinking_recoded/monsters-and-mixtures.html#example-zero-inflated-poisson.
+# Kein Multilevel
+
+# b11.4 <- 
+#   brm(data = d, family = zero_inflated_poisson,
+#       Y ~ 1,
+#       prior = c(prior(normal(0, 10), class = Intercept), # Poisson? lambda?
+#                 prior(beta(2, 2), class = zi)),  # zi: ZeroInflated (p_i), default beta(1,1)
+#       cores = 4,
+#       seed = 11) 
+
+# print(b11.4)
+
+```
+
+https://fcorowe.github.io/countdata_modelling/ 
+
+Was mir an den folgenden Modellen noch nicht gef??llt: 
+
+1. k??nnte man evtl. auf die overdispersed distributions umsteigen, um zus??tzliche Clusterungen abzufangen
+What causes overdispersion? Overdispersion is caused by positive correlation between responses or by an excess variation between response probabilities or counts. Overdispersion also arises when there are violations in the distributional assumptions of the data, such as when the data are clustered and thereby violate the likelihood independence of observations assumption.--> Zero-inflated Negative Binomial regression; oder besser modellieren
+2. sind keine uVs im zero-Inflation Teil drin.
+```{r}
+#| eval = FALSE
+
+library(lme4)
+library(merTools)
+library(glmmTMB) # fitting generalised linear mixed models # kann auch random effects im ZI-Teil
+library(bbmle)
+
+
+# Owls <- transform(Owls,
+#                   Nest = reorder(Nest,NegPerChick),
+#                   NCalls = SiblingNegotiation,
+#                   FT = FoodTreatment)
+# 
+# eq <- NCalls ~ (FT + ArrivalTime) * SexParent + offset( log( BroodSize)) + ( 1 | Nest)
+# 
+# zipoisson1 <- glmmTMB(eq,
+#                       data=Owls,
+#                       ziformula=~1,
+#                       family=poisson)
+# summary(zipoisson1)
+
+# mod_0 <- glmmTMB(answerlength_incl_zero ~ 1 +  (1|respondent_hash),
+#             data = data_poisson,
+#             ziformula =~ 1,
+#             family = poisson)
+# 
+# summary(mod_0)
+# 
+# mod_position <- glmmTMB(answerlength_incl_zero ~ 1 + position + (1|respondent_hash),
+#             data = data_poisson,
+#             ziformula =~ 1,
+#             family = poisson)
+# 
+# summary(mod_position)
+# 
+# mod_instruction <- glmmTMB(answerlength_incl_zero ~ 1 + instruction + (1|respondent_hash),
+#             data = data_poisson,
+#             ziformula =~ 1,
+#             family = poisson)
+# 
+# summary(mod_instruction)
+# 
+# mod_instruction_position <- glmmTMB(answerlength_incl_zero ~ 1 + instruction + position + (1|respondent_hash),
+#             data = data_poisson,
+#             ziformula =~ 1,
+#             family = poisson)
+# 
+# summary(mod_instruction_position)
+
+
+### Erweitertes Modell (ToDo: Angepasst an BRMS-modell)
+
+mod_vgl_brms <- glmmTMB(answerlength_incl_zero ~ 1 + as.factor(question_id) + motiv_cue * as.factor(position) + (1|respondent_hash + teacher_id),
+            data = data_poisson,
+            ziformula =~ 1 + as.factor(question_id) + motiv_cue * as.factor(position)  + (1|respondent_hash + teacher_id),
+            family = poisson)
+
+summary(mod_vgl_brms)
+
+
+
+```
+
+
