@@ -280,11 +280,11 @@ ggplot(
            label = paste("n =", participants$n))+ 
   coord_cartesian(ylim = c(0, 100)) +
   labs(y = "response rates in %")+
-  guides(col=guide_legend(title=NULL))+
-  scale_color_ipsum() +
-  theme_ipsum() 
+  guides(col=guide_legend(title=NULL))#+
+ # scale_color_ipsum() +
+ # theme_ipsum() 
 
-ggsave("plots/prop_OEAs.eps") # ToDo: Dateiformat!
+#ggsave("plots/prop_OEAs.eps") # ToDo: Dateiformat!
 
 
 # # no_oeq_answer: classwise aggregations
@@ -315,9 +315,9 @@ ggplot(
            y = -40,
            label = paste("n =", participants$n))+ 
   stat_summary(position = position_dodge(width = .9)) +
-  guides(col=guide_legend(title=NULL))+
-  scale_color_ipsum() +
-  theme_ipsum()
+  guides(col=guide_legend(title=NULL))#+
+  #scale_color_ipsum() +
+  #theme_ipsum()
 
 ggsave("plots/length_OEAs.eps")
 
@@ -331,33 +331,33 @@ Mehrebenstruktur einfache approaches wie chi^2 oder MWU problematisch macht.
 ```{r}
 #| label: auskommentiert, da schlechter fit
 
-# # generate data
-# data_poisson <- 
-#   data_s1 %>% 
-#   filter(question_id %in% c(47, 48)) %>% 
-#   mutate(answerlength_incl_zero = ifelse(answer_text_isna == T, 0,
-#                                      #    ifelse(oeq_answerlengthifgiven == 1, 0, #??
-#                                                 oeq_answerlengthifgiven))
-# # Das ergibt pro Item die Antwortl??nge, d.h. noch geschachtelt in der Person
-# 
-# data_poisson <- data_poisson %>% 
-#   mutate(motiv_cue = factor(instruction, levels = c("neutral instruction","motivating instruction"))) 
-# 
-# # look at the distribution
-# ggplot(data_poisson, aes(answerlength_incl_zero)) +
-#   geom_histogram(binwidth = 1)
-# 
-# ggplot(data_poisson, aes(answerlength_incl_zero)) +
-#   geom_density()
-# 
-# ggplot(data_poisson, aes(answerlength_incl_zero)) +
-#   geom_histogram(binwidth = 1) +
-#   coord_cartesian(xlim = c(0,50), ylim = c(0, 200))
-# 
-# ggplot(data_poisson, aes(answerlength_incl_zero)) +
-#   geom_histogram(binwidth = 1) +
-#   coord_cartesian(xlim = c(0,50), ylim = c(0, 400))+
-#   facet_wrap(vars(question_id)) 
+# generate data
+data_poisson <-
+  data_s1 %>%
+  filter(question_id %in% c(47, 48)) %>%
+  mutate(answerlength_incl_zero = ifelse(answer_text_isna == T, 0,
+                                     #    ifelse(oeq_answerlengthifgiven == 1, 0, #??
+                                                oeq_answerlengthifgiven))
+# Das ergibt pro Item die Antwortl??nge, d.h. noch geschachtelt in der Person
+
+data_poisson <- data_poisson %>%
+  mutate(motiv_cue = factor(instruction, levels = c("neutral instruction","motivating instruction")))
+
+# look at the distribution
+ggplot(data_poisson, aes(answerlength_incl_zero)) +
+  geom_histogram(binwidth = 1)
+
+ggplot(data_poisson, aes(answerlength_incl_zero)) +
+  geom_density()
+
+ggplot(data_poisson, aes(answerlength_incl_zero)) +
+  geom_histogram(binwidth = 1) +
+  coord_cartesian(xlim = c(0,50), ylim = c(0, 200))
+
+ggplot(data_poisson, aes(answerlength_incl_zero)) +
+  geom_histogram(binwidth = 1) +
+  coord_cartesian(xlim = c(0,50), ylim = c(0, 400))+
+  facet_wrap(vars(question_id))
 
 ```
 
@@ -431,6 +431,11 @@ library(brms)
 ```{r}
 #| label: hurdle 1
 
+rstan_options(auto_write = TRUE)
+options(mc.cores = parallel::detectCores())
+
+set.seed(1234)
+
 library(brms)
 mod_zipoiss <-
   brm(
@@ -440,8 +445,7 @@ mod_zipoiss <-
     ),
     family = zero_inflated_poisson(),
     data = data_poisson,
-    iter = 4000,
-    cores = 20
+    iter = 4000
   )
 
 pp_check(mod_zipoiss, type = 'ecdf_overlay')
@@ -456,8 +460,7 @@ mod_hulognormal <-
     ),
     family = hurdle_lognormal(),
     data = data_poisson,
-    cores = 20,
-    iter = 4000
+    cores = 20
   )
 
 pp_check(mod_hulognormal, type = 'ecdf_overlay')
@@ -473,26 +476,48 @@ mod_hunegbinomial <-
     ),
     family = hurdle_negbinomial(),
     data = data_poisson,
-    iter = 4000,
-    cores = 20
+    iter = 4000
   )
 
 pp_check(mod_hunegbinomial, type = 'ecdf_overlay')
 mod_hunegbinomial_loo <-
   loo(mod_hunegbinomial)
 
+
+mod_hupoisson <-
+  brm(
+   bf(
+      answerlength_incl_zero  ~ 1,
+      hu ~ 1
+    ),
+    family = hurdle_poisson(),
+    data = data_poisson,
+    iter = 4000
+  )
+
+pp_check(mod_hupoisson, type = 'ecdf_overlay')
+mod_hupoisson_loo <-
+  loo(mod_hupoisson)
+
 loo_compare(
   mod_zipoiss_loo,
   mod_hulognormal_loo,
-  mod_hunegbinomial_loo
+  mod_hunegbinomial_loo,
+  mod_hupoisson_loo
 )
 ```
 
-Posterior predictive checks imply that the response variable can be fitted well, assuming a negative binomial distribution. Loo implies the best fit of this distribution in comarison to lognormal or poisson distributions.
+SM: Posterior predictive checks imply that the response variable can be fitted well, assuming a negative binomial distribution. Loo implies the best fit of this distribution in comparison to lognormal or poisson distributions.
+
+SH: why didnt you use a poisson distribution for the non-hurdle part? ok, same output as zero inflated poisson
+[stan uses 2 parameters](https://mc-stan.org/docs/2_20/stan-users-guide/zero-inflated-section.html)
 
 ### Modelling the distribution of the response variable with random effects
 ```{r}
 #| label: hurdle 2
+
+
+set.seed(1234)
 
 library(brms)
 mod_interceptonly_zipoiss <-
@@ -503,8 +528,7 @@ mod_interceptonly_zipoiss <-
     ),
     family = zero_inflated_poisson(),
     data = data_poisson,
-    iter = 4000,
-    cores = 20
+    iter = 4000
   )
 
 pp_check(mod_interceptonly_zipoiss, type = 'ecdf_overlay')
@@ -519,7 +543,7 @@ mod_interceptonly_hulognormal <-
     ),
     family = hurdle_lognormal(),
     data = data_poisson,
-    cores = 20,
+   # cores = 20,
     iter = 4000
   )
 
@@ -536,7 +560,7 @@ mod_interceptonly_hunegbinomial <-
     ),
     family = hurdle_negbinomial(),
     data = data_poisson,
-    cores = 20
+   # cores = 20
   )
 
 pp_check(mod_interceptonly_hunegbinomial, type = 'ecdf_overlay')
@@ -552,7 +576,8 @@ loo_compare(
 
 
 
-### BRMS-package
+### Adding experimental factors to model
+
 
 ```{r}
 
@@ -561,14 +586,15 @@ set.seed(74791)
 
 base_brms <- brm(bf(answerlength_incl_zero  ~ 1 + as.factor(question_id) +
                                 (1 | teacher_id) + (1 | respondent_hash),
-                               zi ~ 1 + as.factor(question_id) +
+                               hu ~ 1 + as.factor(question_id) +
                                  (1 | teacher_id) + (1 | respondent_hash)),
-                            family = zero_inflated_poisson(),
+                            #family = zero_inflated_poisson(),
+                            family = hurdle_negbinomial(),
                             data = data_poisson,
                 iter = 4000)
 saveRDS(base_brms,"base_brms1.rds")
 
-base_brms <-readRDS("base_brms.rds")
+#base_brms <-readRDS("base_brms.rds")
 base_brms1 <-readRDS("base_brms1.rds")
 
 summary(base_brms)
@@ -580,15 +606,16 @@ sjPlot::tab_model(base_brms)
 uVs_brms <- brm(bf(answerlength_incl_zero  ~ 1 + as.factor(question_id) +
                                  motiv_cue+as.factor(position) +
                                  (1 | teacher_id) + (1 | respondent_hash),
-                               zi ~ 1 + as.factor(question_id) +
+                               hu ~ 1 + as.factor(question_id) +
                                  motiv_cue+as.factor(position)+
                                  (1 | teacher_id) + (1 | respondent_hash)),
-                            family = zero_inflated_poisson(),
+                            #family = zero_inflated_poisson(),
+                            family = hurdle_negbinomial(),
                             data = data_poisson,
                 iter = 4000)
 saveRDS(uVs_brms,"uVs_brms1.rds")
 
-uVs_brms <-readRDS("uVs_brms.rds")
+#uVs_brms <-readRDS("uVs_brms.rds")
 uVs_brms1 <-readRDS("uVs_brms1.rds")
 
 summary(uVs_brms)
@@ -600,10 +627,11 @@ set.seed(37440)
 int_brms <- brm(bf(answerlength_incl_zero  ~ 1 + as.factor(question_id) +
                                  motiv_cue*as.factor(position) +
                                  (1 | teacher_id) + (1 | respondent_hash),
-                               zi ~ 1 + as.factor(question_id) +
+                               hu ~ 1 + as.factor(question_id) +
                                 motiv_cue*as.factor(position)+
                                  (1 | teacher_id) + (1 | respondent_hash)),
-                            family = zero_inflated_poisson(),
+                            #family = zero_inflated_poisson(),
+                            family = hurdle_negbinomial(),
                             data = data_poisson,
                 iter = 4000)
 saveRDS(int_brms,"int_brms1.rds")
