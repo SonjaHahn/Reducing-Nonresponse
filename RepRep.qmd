@@ -257,8 +257,8 @@ datasummary(oeq_answerlengthifgiven * factor(question_id) ~ prop_valid + Mean + 
 ### Global Picture
 ```{r}
 # no_oeq_answer: dichotomous
-library(hrbrthemes)
-update_geom_font_defaults()
+#library(hrbrthemes)
+#update_geom_font_defaults()
 
 participants <- data_s1 %>% 
   group_by(position,instruction) %>% 
@@ -329,33 +329,35 @@ Mehrebenstruktur einfache approaches wie chi^2 oder MWU problematisch macht.
 ## Zero-Inflated Poisson-Regression
 
 ```{r}
-# generate data
-data_poisson <- 
-  data_s1 %>% 
-  filter(question_id %in% c(47, 48)) %>% 
-  mutate(answerlength_incl_zero = ifelse(answer_text_isna == T, 0,
-                                     #    ifelse(oeq_answerlengthifgiven == 1, 0, #??
-                                                oeq_answerlengthifgiven))
-# Das ergibt pro Item die Antwortl??nge, d.h. noch geschachtelt in der Person
+#| label: auskommentiert, da schlechter fit
 
-data_poisson <- data_poisson %>% 
-  mutate(motiv_cue = factor(instruction, levels = c("neutral instruction","motivating instruction"))) 
-
-# look at the distribution
-ggplot(data_poisson, aes(answerlength_incl_zero)) +
-  geom_histogram(binwidth = 1)
-
-ggplot(data_poisson, aes(answerlength_incl_zero)) +
-  geom_density()
-
-ggplot(data_poisson, aes(answerlength_incl_zero)) +
-  geom_histogram(binwidth = 1) +
-  coord_cartesian(xlim = c(0,50), ylim = c(0, 200))
-
-ggplot(data_poisson, aes(answerlength_incl_zero)) +
-  geom_histogram(binwidth = 1) +
-  coord_cartesian(xlim = c(0,50), ylim = c(0, 400))+
-  facet_wrap(vars(question_id)) 
+# # generate data
+# data_poisson <- 
+#   data_s1 %>% 
+#   filter(question_id %in% c(47, 48)) %>% 
+#   mutate(answerlength_incl_zero = ifelse(answer_text_isna == T, 0,
+#                                      #    ifelse(oeq_answerlengthifgiven == 1, 0, #??
+#                                                 oeq_answerlengthifgiven))
+# # Das ergibt pro Item die Antwortl??nge, d.h. noch geschachtelt in der Person
+# 
+# data_poisson <- data_poisson %>% 
+#   mutate(motiv_cue = factor(instruction, levels = c("neutral instruction","motivating instruction"))) 
+# 
+# # look at the distribution
+# ggplot(data_poisson, aes(answerlength_incl_zero)) +
+#   geom_histogram(binwidth = 1)
+# 
+# ggplot(data_poisson, aes(answerlength_incl_zero)) +
+#   geom_density()
+# 
+# ggplot(data_poisson, aes(answerlength_incl_zero)) +
+#   geom_histogram(binwidth = 1) +
+#   coord_cartesian(xlim = c(0,50), ylim = c(0, 200))
+# 
+# ggplot(data_poisson, aes(answerlength_incl_zero)) +
+#   geom_histogram(binwidth = 1) +
+#   coord_cartesian(xlim = c(0,50), ylim = c(0, 400))+
+#   facet_wrap(vars(question_id)) 
 
 ```
 
@@ -427,6 +429,8 @@ library(brms)
 
 ### Modelling the distribution of the response variable
 ```{r}
+#| label: hurdle 1
+
 library(brms)
 mod_zipoiss <-
   brm(
@@ -488,6 +492,8 @@ Posterior predictive checks imply that the response variable can be fitted well,
 
 ### Modelling the distribution of the response variable with random effects
 ```{r}
+#| label: hurdle 2
+
 library(brms)
 mod_interceptonly_zipoiss <-
   brm(
@@ -843,4 +849,34 @@ summary(mod_vgl_brms)
 
 ```
 
+Hurdle models
+- https://mc-stan.org/docs/2_20/stan-users-guide/zero-inflated-section.html
+- https://en.wikipedia.org/wiki/Hurdle_model
 
+Effektiv ist das einfach getrennt modelliert und damit flexibler als zero inflated
+Die zweite Verteilung (non-zero part) kann alles mögliche sein, aber ist in Stan
+anscheinend Poisson-Verteilung
+
+
+## LDA
+
+Steps:
+-
+
+
+Packages: quanteda + spacyr (preprocessing), alternativ: topicmodels, mallet
+HANA (preprocessing)
+
+
+Background info:
+- spacyr
+  - ausführliche Installation: https://spacyr.quanteda.io/
+  - https://cran.r-project.org/web/packages/spacyr/index.html
+  - https://spacy.io/universe/project/spacyr
+- Quanteda
+  - http://quanteda.io/articles/quickstart.html
+- topicmodels (aber auch andere Pakete)
+  - https://www.tidytextmining.com/topicmodeling.html
+  https://cran.r-project.org/web/packages/spacyr/index.html
+- Ablauf (python-basiert)
+  - https://medium.com/nlplanet/text-analysis-topic-modelling-with-spacy-gensim-4cd92ef06e06
