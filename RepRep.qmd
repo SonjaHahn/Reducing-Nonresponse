@@ -267,20 +267,23 @@ participants <- data_s1 %>%
 # number of participants
   # not number of answers
 
-ggplot(
+plot_prop <- ggplot(
   data_s1 %>%
     filter(question_id %in% c(47,48)),
   aes(position, (1-as.numeric(no_oeq_answer))*100, color = instruction)) +
   stat_summary(fun = "mean", 
                position = position_dodge(width = 0.25),
-               geom="point") + 
+               geom="point",
+               size = 3) + 
   annotate("text",
            x = c(0.8,1.2,1.8,2.2),
            y = 6,
            label = paste("n =", participants$n))+ 
   coord_cartesian(ylim = c(0, 100)) +
   labs(y = "response rates in %")+
-  guides(col=guide_legend(title=NULL))#+
+  guides(col=guide_legend(title=NULL))+
+  theme_minimal()+
+  theme(legend.position="none")
  # scale_color_ipsum() +
  # theme_ipsum() 
 
@@ -303,7 +306,7 @@ participants <- data_s1 %>%
 # number of participants providing at least one answer
 
 # answertextlength: level-1
-ggplot(
+plot_length <- ggplot(
   data_s1 %>%
     filter(question_id %in% c(47, 48)),
   aes(position, oeq_answerlengthifgiven, color = instruction)
@@ -315,11 +318,17 @@ ggplot(
            y = -40,
            label = paste("n =", participants$n))+ 
   stat_summary(position = position_dodge(width = .9)) +
-  guides(col=guide_legend(title=NULL))#+
+#  guides(col=guide_legend(title=NULL))+
+  theme_minimal()+
+    scale_color_discrete(name = "Instruction", labels = c("motivating", "neutral"))
   #scale_color_ipsum() +
   #theme_ipsum()
+plot_length
 
-ggsave("plots/length_OEAs.eps")
+library(patchwork)
+plot_prop + plot_length
+
+ggsave("descr_OEI.pdf", width = 9)
 
 ```
 
@@ -329,7 +338,7 @@ Mehrebenstruktur einfache approaches wie chi^2 oder MWU problematisch macht.
 ## Zero-Inflated Poisson-Regression
 
 ```{r}
-#| label: auskommentiert, da schlechter fit
+
 
 # generate data
 data_poisson <-
@@ -595,7 +604,7 @@ base_brms <- brm(bf(answerlength_incl_zero  ~ 1 + as.factor(question_id) +
 saveRDS(base_brms,"base_brms1.rds")
 
 #base_brms <-readRDS("base_brms.rds")
-base_brms1 <-readRDS("base_brms1.rds")
+#base_brms1 <-readRDS("base_brms1.rds")
 
 summary(base_brms)
 sjPlot::tab_model(base_brms)
@@ -616,7 +625,7 @@ uVs_brms <- brm(bf(answerlength_incl_zero  ~ 1 + as.factor(question_id) +
 saveRDS(uVs_brms,"uVs_brms1.rds")
 
 #uVs_brms <-readRDS("uVs_brms.rds")
-uVs_brms1 <-readRDS("uVs_brms1.rds")
+#uVs_brms1 <-readRDS("uVs_brms1.rds")
 
 summary(uVs_brms)
 sjPlot::tab_model(uVs_brms)
@@ -636,11 +645,12 @@ int_brms <- brm(bf(answerlength_incl_zero  ~ 1 + as.factor(question_id) +
                 iter = 4000)
 saveRDS(int_brms,"int_brms1.rds")
 
-int_brms <-readRDS("int_brms.rds")
-int_brms1 <-readRDS("int_brms1.rds")
+#int_brms <-readRDS("int_brms.rds")
+int_brms <-readRDS("int_brms1.rds")
 
 summary(int_brms)
-sjPlot::tab_model(int_brms)
+sjPlot::tab_model(int_brms, file = "humodel.doc")
+
 
 
 # Darstellung der Ergebnisse
@@ -662,13 +672,14 @@ sjPlot::tab_model(int_brms)
 pp_check(int_brms)+
     xlim(0, 100)
 
-pp_check(uVs_brms)
+pp_check(uVs_brms)+
+    xlim(0, 100)
 
-pp_check(uVs_brms1)+
+pp_check(base_brms)+
     xlim(0, 100)
 ```
 
-
+immer noch nicht perfekt
 
 
 ## Modellvergleiche
