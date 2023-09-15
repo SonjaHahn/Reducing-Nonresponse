@@ -255,6 +255,7 @@ datasummary(oeq_answerlengthifgiven * factor(question_id) ~ prop_valid + Mean + 
 
 
 ### Global Picture
+
 ```{r}
 # no_oeq_answer: dichotomous
 #library(hrbrthemes)
@@ -280,9 +281,9 @@ ggplot(
            label = paste("n =", participants$n))+ 
   coord_cartesian(ylim = c(0, 100)) +
   labs(y = "response rates in %")+
-  guides(col=guide_legend(title=NULL))+
-  scale_color_ipsum() +
-  theme_ipsum() 
+  guides(col=guide_legend(title=NULL))#+
+  #scale_color_ipsum() +
+  #theme_ipsum() 
 
 ggsave("plots/prop_OEAs.eps") # ToDo: Dateiformat!
 
@@ -315,9 +316,9 @@ ggplot(
            y = -40,
            label = paste("n =", participants$n))+ 
   stat_summary(position = position_dodge(width = .9)) +
-  guides(col=guide_legend(title=NULL))+
-  scale_color_ipsum() +
-  theme_ipsum()
+  guides(col=guide_legend(title=NULL))#+
+  #scale_color_ipsum() +
+  #theme_ipsum()
 
 ggsave("plots/length_OEAs.eps")
 
@@ -329,35 +330,34 @@ Mehrebenstruktur einfache approaches wie chi^2 oder MWU problematisch macht.
 ## Zero-Inflated Poisson-Regression
 
 ```{r}
-#| label: auskommentiert, da schlechter fit
 
 # # generate data
-# data_poisson <- 
-#   data_s1 %>% 
-#   filter(question_id %in% c(47, 48)) %>% 
-#   mutate(answerlength_incl_zero = ifelse(answer_text_isna == T, 0,
-#                                      #    ifelse(oeq_answerlengthifgiven == 1, 0, #??
-#                                                 oeq_answerlengthifgiven))
+data_poisson <-
+  data_s1 %>%
+  filter(question_id %in% c(47, 48)) %>%
+  mutate(answerlength_incl_zero = ifelse(answer_text_isna == T, 0,
+                                     #    ifelse(oeq_answerlengthifgiven == 1, 0, #??
+                                                oeq_answerlengthifgiven))
 # # Das ergibt pro Item die Antwortl??nge, d.h. noch geschachtelt in der Person
 # 
-# data_poisson <- data_poisson %>% 
-#   mutate(motiv_cue = factor(instruction, levels = c("neutral instruction","motivating instruction"))) 
-# 
-# # look at the distribution
-# ggplot(data_poisson, aes(answerlength_incl_zero)) +
-#   geom_histogram(binwidth = 1)
-# 
-# ggplot(data_poisson, aes(answerlength_incl_zero)) +
-#   geom_density()
-# 
-# ggplot(data_poisson, aes(answerlength_incl_zero)) +
-#   geom_histogram(binwidth = 1) +
-#   coord_cartesian(xlim = c(0,50), ylim = c(0, 200))
-# 
-# ggplot(data_poisson, aes(answerlength_incl_zero)) +
-#   geom_histogram(binwidth = 1) +
-#   coord_cartesian(xlim = c(0,50), ylim = c(0, 400))+
-#   facet_wrap(vars(question_id)) 
+data_poisson <- data_poisson %>%
+  mutate(motiv_cue = factor(instruction, levels = c("neutral instruction","motivating instruction")))
+
+# look at the distribution
+ggplot(data_poisson, aes(answerlength_incl_zero)) +
+  geom_histogram(binwidth = 1)
+
+ggplot(data_poisson, aes(answerlength_incl_zero)) +
+  geom_density()
+
+ggplot(data_poisson, aes(answerlength_incl_zero)) +
+  geom_histogram(binwidth = 1) +
+  coord_cartesian(xlim = c(0,50), ylim = c(0, 200))
+
+ggplot(data_poisson, aes(answerlength_incl_zero)) +
+  geom_histogram(binwidth = 1) +
+  coord_cartesian(xlim = c(0,50), ylim = c(0, 400))+
+  facet_wrap(vars(question_id))
 
 ```
 
@@ -365,11 +365,11 @@ Mehrebenstruktur einfache approaches wie chi^2 oder MWU problematisch macht.
 ```{r}
 # # https://strengejacke.github.io/sjPlot/articles/tab_bayes.html
 # # load required packages
-library(sjPlot)
-library(insight)
-library(httr)
-library(brms)
-# 
+# library(sjPlot)
+# library(insight)
+# library(httr)
+# library(brms)
+# # 
 # # m1 <- insight::download_model("brms_zi_2")
 # # 
 # # zinb <- read.csv("http://stats.idre.ucla.edu/stat/data/fish.csv")
@@ -860,8 +860,412 @@ anscheinend Poisson-Verteilung
 
 ## LDA
 
+```{r}
+#| label: positive Answers:  TM via standard LDA, positive answers
+library(quanteda)
+#require(quanteda.corpora)
+require(seededlda)
+require(lubridate)
+
+## Construct corpus
+
+# separate analyses for both questions - easier interpretation of emerging topics
+
+data_lda_pos <-  data_s1 %>%
+  filter(question_id %in% c(47)) %>% #  filter(question_id %in% c(47, 48)) %>%
+  select(instruction, position, answer_text) |> 
+  unite(col = "docid_field", instruction, position, remove = TRUE) |> 
+  rename(text_field = answer_text) |> 
+  drop_na() #|> 
+ # as.data.frame() |> 
+#  mutate(text_field = as.character(answer_text))
+
+View(data_lda_pos)
+
+my_corpus <- corpus(data_lda_pos, text_field = "text_field")
+
+summary(my_corpus)
+
+dfmat_my_corpus <- my_corpus |>
+    tokens(remove_punct = TRUE, remove_numbers = TRUE, remove_url = TRUE, remove_symbols = TRUE) |>  # evtl. Stopwords anpassen: Dass kann raus, aber "Alles" sollte drin bleiben (einige Antworten sind "Alles", tauchen dann mit NA in der LDA auf)
+   tokens_remove(stopwords("de")) |> # https://cran.r-project.org/web/packages/stopwords/readme/README.html # different and modifying lists of stopwords
+    dfm()
+print(dfmat_my_corpus)
+
+## eventuell sehr h√§ufige bzw. seltene Worte entfernen (bessere Differenzierbarekeit)
+
+
+set.seed(100)
+library("quanteda.textplots")
+textplot_wordcloud(dfmat_my_corpus, min_count = 6, random_order = FALSE, rotation = 0.25,
+    color = RColorBrewer::brewer.pal(8, "Dark2"))
+
+# via stm # eher lansamg
+# library("stm") 
+# library("quanteda.textmodels")
+#     set.seed(100)
+#     my_lda_fit20 <- stm(dfmat_my_corpus, K = 20, verbose = FALSE)
+#     plot(my_lda_fit20)
+    
+# via seededlda # Fkt f√ºr Anzahl Themen, Vorgabe von Worten mgl.
+library(seededlda)
+set.seed(100)
+tmod_lda <- textmodel_lda(dfmat_my_corpus, k = 25)
+divergence(tmod_lda)
+tmod_lda <- textmodel_lda(dfmat_my_corpus, k = 20)
+divergence(tmod_lda)
+tmod_lda <- textmodel_lda(dfmat_my_corpus, k = 15)
+divergence(tmod_lda)
+tmod_lda <- textmodel_lda(dfmat_my_corpus, k = 10)
+divergence(tmod_lda)
+tmod_lda <- textmodel_lda(dfmat_my_corpus, k = 5)
+divergence(tmod_lda)
+tmod_lda <- textmodel_lda(dfmat_my_corpus, k = 8)
+divergence(tmod_lda)
+tmod_lda <- textmodel_lda(dfmat_my_corpus, k = 9)
+divergence(tmod_lda)
+tmod_lda <- textmodel_lda(dfmat_my_corpus, k = 11)
+divergence(tmod_lda)
+tmod_lda <- textmodel_lda(dfmat_my_corpus, k = 12)
+divergence(tmod_lda)
+set.seed(1234)
+tmod_lda <- textmodel_lda(dfmat_my_corpus, k = 9)
+terms(tmod_lda, 15)
+sizes(tmod_lda)
+head(topics(tmod_lda), 20)
+
+
+
+# die Themen sind teilweise recht aehnlich, viele mit erklaeren
+# Nochmal genauer schauen (Labels, mehr Zeilen, evtl. Beispiele)
+# andererseits vielleicht sogar eine Staerke der analyse, dass erklaeren verschiedene Aspekte hat
+
+# assign topic as a new document-level variable
+dfmat_my_corpus$topic <- topics(tmod_lda)
+
+data_lda_pos$toptopic <- dfmat_my_corpus$topic
+View(data_lda_pos)
+
+    
+my_labels<- c("motivierend","hilfsbereit","eingehen auf SuS","eingehen auf Fragen","hilfsbereit II",
+          "Tafelbilder","strukturiert", "gue erklaert", "Verstaendlich")
+
+# cross-table of the topic frequency
+table(dfmat_my_corpus$topic)
+
+# Proportion of most probable topic per answer in each exp. condition
+topic_per_condition <- docvars(dfmat_my_corpus) |> 
+                          drop_na() |> 
+                          group_by(docid_field, topic) |> 
+                          summarize(n=n()) |>  # da kommt ne fehlermeldung, das ist aber nur ne Info, weil genau so aggregiert werden soll
+                          mutate(freq = n / sum(n)) |> 
+                          ungroup() |> 
+                          mutate(condition = as.factor(docid_field), topic_n = as.numeric(topic)) 
+# kann vermutlich verbessert werden, indem man Unsicherheiten oder komplette Wahrscheinlichkeiten von Themen aus dem Modell mit einbezieht, aber wird evtl. schwerer verst‰ndlich
+
+# plot it
+topic_per_condition
+
+ggplot(topic_per_condition, aes(x = topic_n, y = freq, shape = condition))+ 
+  geom_point() + 
+   scale_shape_manual(values=c(17, 15, 2 , 0))+
+  ylim(0, 0.2) +
+  ylab("Proportion of top theme in answers by experimental condition")+
+  xlab("Topics")+
+  scale_x_reverse(n.breaks = 8)+
+ ggtitle("Comparison of Topic Model for positive feedback")+
+  coord_flip()+
+ annotate("text", label = my_labels[1:9], x = 1:9, y = 0.001, hjust = 0)+
+  theme_minimal()
+
+
+
+```
+
+```{r}
+#| label: seeded lda
+
+dict <- dictionary(list(#offtopic = c("Rauchen", "Mate", "S¸ﬂigkeiten", "Schokobons", "Gesundheit"), # f¸r negativ-items
+                        Motivation = c("motivierend", "Atmosph‰re","Spaﬂ", "positiv", "Humor","dynamisch", "locker", "Stimmung"), # SEEQ Enthusiasmus
+                        Explanations = c("verst‰ndlich","Beispiele","erkl‰rt", "anschaulich","ausf¸hrlich"),
+                        Person = c("sympathisch", "humorvoll", "freundlich","nett","offen"), # Big 5?
+                        Support = c("hilfsbereit", "eingegangen", "einzelne", "Teilnehmer", "individuell","Fragen","Fehler"), # SEEQ Individualle Beziehung
+                        Management = c("Zeit", "genommen", "nachgefragt"),
+                        #Group = c("Austausch","beteiligt","zusammen"), # SEEQ Gruppeninteraktion ! "alle" ist Stopword # fkt nicht
+                        Structure = c("Struktur", "strukturiert","Schritte", "sorgf‰ltig","Tafel", "Tafelbilder", "‹bersicht", "¸bersichtlich") # SEEQ Organisation ???
+                        )) 
+
+# evtl. noch "Alles gut"/Es war alles super
+
+
+lda_seed <- textmodel_seededlda(dfmat_my_corpus, dict)
+
+terms(lda_seed, 20)
+topics(lda_seed)
+
+dfmat_my_corpus$topic_seeded <- topics(lda_seed)
+
+data_lda_pos$toptopic_seeded <- dfmat_my_corpus$topic_seeded
+View(data_lda_pos)
+
+    
+# cross-table of the topic frequency
+table(dfmat_my_corpus$topic_seeded)
+
+# Proportion of most probable topic per answer in each exp. condition
+topic_per_condition <- docvars(dfmat_my_corpus) |> 
+                          drop_na() |> 
+                          group_by(docid_field, topic_seeded) |> 
+                          summarize(n=n()) |>  # da kommt ne fehlermeldung, das ist aber nur ne Info, weil genau so aggregiert werden soll
+                          mutate(freq = n / sum(n)) |> 
+                          ungroup() |> 
+                          mutate(condition = as.factor(docid_field)) |> 
+                          mutate(topic_n = case_when(topic_seeded == names(dict)[1] ~ 1,
+                                                     topic_seeded == names(dict)[2] ~ 2,
+                                                     topic_seeded == names(dict)[3] ~ 3,
+                                                     topic_seeded == names(dict)[4] ~ 4,
+                                                     topic_seeded == names(dict)[5] ~ 5,
+                                                     topic_seeded == names(dict)[6] ~ 6
+                                                     ))
+  
+ 
+# kann vermutlich verbessert werden, indem man Unsicherheiten oder komplette Wahrscheinlichkeiten von Themen aus dem Modell mit einbezieht, aber wird evtl. schwerer verst‰ndlich
+
+# plot it
+topic_per_condition
+
+ggplot(topic_per_condition, aes(x = topic_n, y = freq, shape = condition))+ 
+  geom_point() + 
+   scale_shape_manual(values=c(17, 15, 2 , 0))+
+  ylim(0, 0.3) +
+  ylab("Proportion of top theme in answers by experimental condition")+
+  xlab("Topics")+
+  scale_x_reverse(n.breaks = 5)+
+ ggtitle("Comparison of seeded Topic Model for positive feedback")+
+  coord_flip()+
+ annotate("text", label = names(dict)[1:6], x = 1:6, y = 0.001, hjust = 0)+
+  theme_minimal()
+
+
+
+```
+
+
+```{r}
+#| label: Do the same but with topic probabilites for each document instead of top models
+
+# access theta (prob for each topic given a document)
+topic_doc_prob <- data.frame(lda_seed$theta,
+                             condition = data_lda_pos$docid_field)
+# add exp condition
+names(topic_doc_prob) <- c(names(dict), "condition")
+View(topic_doc_prob)
+
+# summarize
+# Mean probability for each topicin each exp. condition
+topic_per_condition <- topic_doc_prob |> 
+                          drop_na() |> 
+                          group_by(condition) |>
+                          summarise(across(everything(), mean),.groups = 'drop')
+  
+# make sure that add up to approx 1
+apply(topic_per_condition[-1], 1, sum)
+
+# Long format for plotting
+topic_per_condition <- gather(topic_per_condition, topic_seeded, probability, names(dict)[1]:names(dict)[6]) |>
+  mutate(condition = as.factor(condition)) |> 
+                          mutate(topic_n = case_when(topic_seeded == names(dict)[1] ~ 1,
+                                                     topic_seeded == names(dict)[2] ~ 2,
+                                                     topic_seeded == names(dict)[3] ~ 3,
+                                                     topic_seeded == names(dict)[4] ~ 4,
+                                                     topic_seeded == names(dict)[5] ~ 5,
+                                                     topic_seeded == names(dict)[6] ~ 6
+                                                     ))
+
+
+
+
+# plot it
+topic_per_condition
+
+ggplot(topic_per_condition, aes(x = topic_n, y = probability, shape = condition))+ 
+  geom_point() + 
+   scale_shape_manual(values=c(17, 15, 2 , 0))+
+  ylim(0, 0.3) +
+  ylab("Mean probability of theme in answers by experimental condition")+
+  xlab("Topics")+
+  scale_x_reverse(n.breaks = 5)+
+ ggtitle("Comparison of seeded Topic Model for positive feedback")+
+  coord_flip()+
+ annotate("text", label = names(dict)[1:6], x = 1:6, y = 0.001, hjust = 0)+
+  theme_minimal()
+  
+
+```
+
+
+```{r}
+#| label: Negative Answers:  TM via standard LDA
+library(quanteda)
+#require(quanteda.corpora)
+require(seededlda)
+require(lubridate)
+
+## Construct corpus
+
+# separate analyses for both questions - easier interpretation of emerging topics
+
+data_lda_neg <-  data_s1 %>%
+  filter(question_id %in% c(48)) %>% #  filter(question_id %in% c(47, 48)) %>%
+  select(instruction, position, answer_text) |> 
+  unite(col = "docid_field", instruction, position, remove = TRUE) |> 
+  rename(text_field = answer_text) |> 
+  drop_na() #|> 
+ # as.data.frame() |> 
+#  mutate(text_field = as.character(answer_text))
+
+View(data_lda_neg)
+
+my_corpus <- corpus(data_lda_neg, text_field = "text_field")
+
+summary(my_corpus)
+
+dfmat_my_corpus <- my_corpus |>
+    tokens(remove_punct = TRUE, remove_numbers = TRUE, remove_url = TRUE, remove_symbols = TRUE) |>  # evtl. Stopwords anpassen: Dass kann raus, aber "Alles" sollte drin bleiben (einige Antworten sind "Alles", tauchen dann mit NA in der LDA auf)
+   tokens_remove(stopwords("de")) |> # https://cran.r-project.org/web/packages/stopwords/readme/README.html # different and modifying lists of stopwords
+    dfm()
+print(dfmat_my_corpus)
+
+## eventuell sehr h√§ufige bzw. seltene Worte entfernen (bessere Differenzierbarekeit)
+## einige Antworten heiﬂen eigentlich: Nichts auszusetzen - was machen wir mit denen
+
+
+set.seed(100)
+library("quanteda.textplots")
+textplot_wordcloud(dfmat_my_corpus, min_count = 6, random_order = FALSE, rotation = 0.25,
+    color = RColorBrewer::brewer.pal(8, "Dark2"))
+
+# via stm # eher lansamg
+# library("stm") 
+# library("quanteda.textmodels")
+#     set.seed(100)
+#     my_lda_fit20 <- stm(dfmat_my_corpus, K = 20, verbose = FALSE)
+#     plot(my_lda_fit20)
+    
+# via seededlda # Fkt f√ºr Anzahl Themen, Vorgabe von Worten mgl.
+library(seededlda)
+set.seed(1234)
+tmod_lda <- textmodel_lda(dfmat_my_corpus, k = 25)
+divergence(tmod_lda)
+tmod_lda <- textmodel_lda(dfmat_my_corpus, k = 20)
+divergence(tmod_lda)
+tmod_lda <- textmodel_lda(dfmat_my_corpus, k = 15)
+divergence(tmod_lda)
+tmod_lda <- textmodel_lda(dfmat_my_corpus, k = 10)
+divergence(tmod_lda)
+tmod_lda <- textmodel_lda(dfmat_my_corpus, k = 5)
+divergence(tmod_lda)
+tmod_lda <- textmodel_lda(dfmat_my_corpus, k = 8)
+divergence(tmod_lda)
+tmod_lda <- textmodel_lda(dfmat_my_corpus, k = 9)
+divergence(tmod_lda)
+set.seed(1234)
+tmod_lda <- textmodel_lda(dfmat_my_corpus, k = 9)
+divergence(tmod_lda)
+terms(tmod_lda, 15)
+sizes(tmod_lda)
+head(topics(tmod_lda), 20)
+
+
+# die Themen sind teilweise recht aehnlich, viele mit erklaeren
+# Nochmal genauer schauen 
+# andererseits vielleicht sogar eine Staerke der analyse, dass erklaeren verschiedene Aspekte hat
+
+# assign topic as a new document-level variable
+dfmat_my_corpus$topic <- topics(tmod_lda)
+
+data_lda_neg$toptopic <- dfmat_my_corpus$topic
+View(data_lda_neg)
+    
+my_labels<- c("besser erklaeren","mehr auf TN eingehen","Tafel etc.","mehr... (erklaeren/Schokobons)",
+           "zu schnell","Alles gut","Zeitmanagment","langsamer erklaeren","Mehr Aufgaben")
+
+# my_labels<- c("zu schnell","Tafelanschrieb","Zeitmanagment","Alles gut","mehr Zeit fuer Aufgaben",
+# "Mehr Aufgaben","mehr auf TN eingehen",, "Classroom-Management")
+
+# cross-table of the topic frequency
+table(dfmat_my_corpus$topic)
+
+# Proportion of most probable topic per answer in each exp. condition
+topic_per_condition <- docvars(dfmat_my_corpus) |> 
+                          drop_na() |> 
+                          group_by(docid_field, topic) |> 
+                          summarize(n=n()) |>  # da kommt ne fehlermeldung, das ist aber nur ne Info, weil genau so aggregiert werden soll
+                          mutate(freq = n / sum(n)) |> 
+                          ungroup() |> 
+                          mutate(condition = as.factor(docid_field), topic_n = as.numeric(topic)) 
+# kann vermutlich verbessert werden, indem man Unsicherheiten oder komplette Wahrscheinlichkeiten von Themen aus dem Modell mit einbezieht, aber wird evtl. schwerer verst‰ndlich
+
+# plot it
+topic_per_condition
+
+ggplot(topic_per_condition, aes(x = topic_n, y = freq, shape = condition))+ 
+  geom_point() + 
+   scale_shape_manual(values=c(17, 15, 2 , 0))+
+  ylim(0, 0.175) +
+  ylab("Proportion of top theme in answers by experimental condition")+
+  xlab("Topics")+
+  scale_x_reverse(n.breaks = 9)+
+ ggtitle("Comparison of Topic Model for negative feedback")+
+  coord_flip()+
+ annotate("text", label = my_labels[1:9], x = 1:9, y = 0.001, hjust = 0)+
+  theme_minimal()
+
+
+```
+
+
+ToDo: ggf. anpassen an andere
+
+
+```{r}
+#| label: old stuff
+
+data_lda <-  data_s1 %>%
+  filter(question_id %in% c(47, 48)) %>%
+   mutate(motiv_cue = factor(instruction, levels = c("neutral instruction","motivating instruction")))
+
+text_bm <- data_lda |> 
+  filter(position == "at the beginning", instruction == "motivating instruction") |>
+  select(answer_text) 
+
+text_em <- data_lda |> 
+  filter(position == "at the end", instruction == "motivating instruction") |>
+  select(answer_text) 
+
+text_bn <- data_lda |> 
+  filter(position == "at the beginning", instruction == "neutral instruction") |>
+  select(answer_text) 
+
+text_en <- data_lda |> 
+  filter(position == "at the end", instruction == "neutral instruction") |>
+  select(answer_text) 
+
+library(spacyr)
+spacy_install()
+spacy_initialize()
+spacy_download_langmodel("de")
+ 
+# # Das ergibt pro Item die Antwortl??nge, d.h. noch geschachtelt in der Person
+# # 
+# data_poisson <- data_poisson %>%
+#   mutate(motiv_cue = factor(instruction, levels = c("neutral instruction","motivating instruction")))
+
+```
+
+
 Steps:
--
+- 
 
 
 Packages: quanteda + spacyr (preprocessing), alternativ: topicmodels, mallet
@@ -880,3 +1284,5 @@ Background info:
   https://cran.r-project.org/web/packages/spacyr/index.html
 - Ablauf (python-basiert)
   - https://medium.com/nlplanet/text-analysis-topic-modelling-with-spacy-gensim-4cd92ef06e06
+
+
